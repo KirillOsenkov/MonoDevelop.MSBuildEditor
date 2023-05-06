@@ -48,7 +48,7 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 				() => new MSBuildCompletionSource (
 					textView,
 					this,
-					ParserProvider.GetParser (textView.TextBuffer),
+					ParserProvider,
 					XmlParserProvider,
 					EditorLoggerService.CreateLogger<MSBuildCompletionSource>(textView))
 			);
