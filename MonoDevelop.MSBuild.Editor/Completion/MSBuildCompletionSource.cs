@@ -36,17 +36,17 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 {
 	partial class MSBuildCompletionSource : XmlCompletionSource, ICompletionDocumentationProvider
 	{
-		readonly MSBuildBackgroundParser parser;
+		readonly MSBuildParserProvider parserProvider;
 		readonly MSBuildCompletionSourceProvider provider;
 
 		public MSBuildCompletionSource (
 			ITextView textView,
 			MSBuildCompletionSourceProvider provider,
-			MSBuildBackgroundParser parser,
+			MSBuildParserProvider parserProvider,
 			XmlParserProvider xmlParserProvider,
 			ILogger logger) : base (textView, logger, xmlParserProvider)
 		{
-			this.parser = parser;
+			this.parserProvider = parserProvider;
 			this.provider = provider;
 		}
 
@@ -67,9 +67,10 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 				return context;
 			}
 
+			var parser = parserProvider.GetParser (triggerLocation.Snapshot.TextBuffer);
 			MSBuildParseResult parseResult = parser.LastOutput ?? await parser.GetOrProcessAsync (triggerLocation.Snapshot, token);
 			var doc = parseResult.MSBuildDocument ?? MSBuildRootDocument.Empty;
-			var spine = XmlParser.GetSpineParser (triggerLocation);
+			var spine = GetSpineParser (triggerLocation);
 			// clone the spine because the resolver alters it
 			var rr = MSBuildResolver.Resolve (spine.Clone (), triggerLocation.Snapshot.GetTextSource (), doc, provider.FunctionTypeProvider, token);
 			context = new MSBuildCompletionSessionContext { doc = doc, rr = rr, spine = spine };
@@ -200,7 +201,7 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 		public override CompletionStartData InitializeCompletion (CompletionTrigger trigger, SnapshotPoint triggerLocation, CancellationToken token)
 		{
 			//we don't care need a real document here we're doing very basic resolution for triggering
-			var spine = XmlParser.GetSpineParser (triggerLocation);
+			var spine = GetSpineParser (triggerLocation);
 			var rr = MSBuildResolver.Resolve (spine.Clone (), triggerLocation.Snapshot.GetTextSource (), MSBuildRootDocument.Empty, null, token);
 			if (rr?.ElementSyntax != null) {
 				var reason = ConvertReason (trigger.Reason, trigger.Character);
