@@ -36,17 +36,17 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 {
 	partial class MSBuildCompletionSource : XmlCompletionSource, ICompletionDocumentationProvider
 	{
-		readonly MSBuildBackgroundParser parser;
+		readonly MSBuildParserProvider parserProvider;
 		readonly MSBuildCompletionSourceProvider provider;
 
 		public MSBuildCompletionSource (
 			ITextView textView,
 			MSBuildCompletionSourceProvider provider,
-			MSBuildBackgroundParser parser,
+			MSBuildParserProvider parserProvider,
 			XmlParserProvider xmlParserProvider,
 			ILogger logger) : base (textView, logger, xmlParserProvider)
 		{
-			this.parser = parser;
+			this.parserProvider = parserProvider;
 			this.provider = provider;
 		}
 
@@ -67,6 +67,7 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 				return context;
 			}
 
+			var parser = parserProvider.GetParser (triggerLocation.Snapshot.TextBuffer);
 			MSBuildParseResult parseResult = parser.LastOutput ?? await parser.GetOrProcessAsync (triggerLocation.Snapshot, token);
 			var doc = parseResult.MSBuildDocument ?? MSBuildRootDocument.Empty;
 			var spine = GetSpineParser (triggerLocation);
