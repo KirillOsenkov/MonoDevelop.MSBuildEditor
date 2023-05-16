@@ -6,14 +6,15 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
+
 using Microsoft.Extensions.Logging;
+
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Text.Editor;
 
 using MonoDevelop.MSBuild.Editor.Completion;
 using MonoDevelop.MSBuild.Language;
 using MonoDevelop.Xml.Editor;
-using MonoDevelop.Xml.Editor.Completion;
 using MonoDevelop.Xml.Editor.HighlightReferences;
 using MonoDevelop.Xml.Editor.Tagging;
 
@@ -48,7 +49,7 @@ namespace MonoDevelop.MSBuild.Editor.HighlightReferences
 				return Empty;
 			}
 
-			var rr = MSBuildResolver.Resolve (spineParser, textSource, doc, provider.FunctionTypeProvider, token);
+			var rr = MSBuildResolver.Resolve (spineParser, textSource, doc, provider.FunctionTypeProvider, Logger, token);
 			if (!MSBuildReferenceCollector.CanCreate (rr)) {
 				return Empty;
 			}
@@ -61,10 +62,11 @@ namespace MonoDevelop.MSBuild.Editor.HighlightReferences
 
 			var references = new List<(ReferenceUsage usage, SnapshotSpan span)> ();
 			var collector = MSBuildReferenceCollector.Create (
+				doc, doc.Text, Logger,
 				rr, provider.FunctionTypeProvider,
 				r => references.Add ((r.Usage, new SnapshotSpan (snapshot, r.Offset, r.Length))));
 
-			await Task.Run (() => collector.Run (doc, token: token), token);
+			await Task.Run (() => collector.Run (doc.XDocument.RootElement, token: token), token);
 
 			return (
 				new SnapshotSpan (caretLocation.Snapshot, rr.ReferenceOffset, rr.ReferenceLength),

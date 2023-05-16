@@ -9,6 +9,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Microsoft.Extensions.Logging;
+
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion;
 using Microsoft.VisualStudio.Language.Intellisense.AsyncCompletion.Data;
 using Microsoft.VisualStudio.Text;
@@ -39,12 +41,7 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 		readonly MSBuildParserProvider parserProvider;
 		readonly MSBuildCompletionSourceProvider provider;
 
-		public MSBuildCompletionSource (
-			ITextView textView,
-			MSBuildCompletionSourceProvider provider,
-			MSBuildParserProvider parserProvider,
-			XmlParserProvider xmlParserProvider,
-			ILogger logger) : base (textView, logger, xmlParserProvider)
+		public MSBuildCompletionSource (ITextView textView, MSBuildCompletionSourceProvider provider, ILogger logger) : base (textView, logger, provider.XmlParserProvider)
 		{
 			this.parserProvider = parserProvider;
 			this.provider = provider;
@@ -72,7 +69,7 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 			var doc = parseResult.MSBuildDocument ?? MSBuildRootDocument.Empty;
 			var spine = GetSpineParser (triggerLocation);
 			// clone the spine because the resolver alters it
-			var rr = MSBuildResolver.Resolve (spine.Clone (), triggerLocation.Snapshot.GetTextSource (), doc, provider.FunctionTypeProvider, token);
+			var rr = MSBuildResolver.Resolve (spine.Clone (), triggerLocation.Snapshot.GetTextSource (), doc, provider.FunctionTypeProvider, Logger, token);
 			context = new MSBuildCompletionSessionContext { doc = doc, rr = rr, spine = spine };
 			session.Properties.AddProperty (typeof (MSBuildCompletionSessionContext), context);
 			return context;
@@ -202,7 +199,7 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 		{
 			//we don't care need a real document here we're doing very basic resolution for triggering
 			var spine = GetSpineParser (triggerLocation);
-			var rr = MSBuildResolver.Resolve (spine.Clone (), triggerLocation.Snapshot.GetTextSource (), MSBuildRootDocument.Empty, null, token);
+			var rr = MSBuildResolver.Resolve (spine.Clone (), triggerLocation.Snapshot.GetTextSource (), MSBuildRootDocument.Empty, null, logger, token);
 			if (rr?.ElementSyntax != null) {
 				var reason = ConvertReason (trigger.Reason, trigger.Character);
 				if (reason.HasValue && IsPossibleExpressionCompletionContext (spine)) {
@@ -215,7 +212,8 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 						out int triggerLength,
 						out ExpressionNode _,
 						out var _,
-						out IReadOnlyList<ExpressionNode> _
+						out IReadOnlyList<ExpressionNode> _,
+						Logger
 					);
 					if (triggerState != TriggerState.None) {
 						return new CompletionStartData (CompletionParticipation.ProvidesItems, new SnapshotSpan (triggerLocation.Snapshot, triggerLocation.Position - triggerLength, triggerLength));
@@ -261,7 +259,8 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 						out int triggerLength,
 						out ExpressionNode triggerExpression,
 						out var listKind,
-						out IReadOnlyList<ExpressionNode> comparandVariables
+						out IReadOnlyList<ExpressionNode> comparandVariables,
+						Logger
 					);
 					if (triggerState != TriggerState.None) {
 						var info = rr.GetElementOrAttributeValueInfo (doc);
@@ -280,7 +279,7 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 		async Task<List<CompletionItem>> GetPackageNameCompletions (IAsyncCompletionSession session, MSBuildRootDocument doc, string searchQuery, string packageType, CancellationToken token)
 		{
 			var tfm = doc.GetTargetFrameworkNuGetSearchParameter ();
-			session.Properties.AddProperty (typeof (NuGetSearchUpdater), new NuGetSearchUpdater (this, session, tfm, packageType));
+			session.Properties.AddProperty (typeof (NuGetSearchUpdater), new NuGetSearchUpdater (this, session, tfm, packageType, Logger));
 
 			if (string.IsNullOrEmpty (searchQuery)) {
 				return null;
@@ -389,7 +388,7 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 					AddSdksFromDir (sdksPath);
 				}
 
-				var dotNetSdk = doc.Environment.ResolveSdk (("Microsoft.NET.Sdk", null, null), null, null);
+				var dotNetSdk = doc.Environment.ResolveSdk (("Microsoft.NET.Sdk", null, null), null, null, Logger);
 				if (dotNetSdk?.Path is string sdkPath) {
 					string dotNetSdkPath = Path.GetDirectoryName (Path.GetDirectoryName (sdkPath));
 					if (sdksPath == null || Path.GetFullPath (dotNetSdkPath) != Path.GetFullPath (sdksPath)) {
@@ -442,7 +441,7 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 			var items = new List<CompletionItem> ();
 
 			if (comparandVariables != null && isValue) {
-				foreach (var ci in ExpressionCompletion.GetComparandCompletions (doc, comparandVariables)) {
+				foreach (var ci in ExpressionCompletion.GetComparandCompletions (doc, comparandVariables, Logger)) {
 					items.Add (CreateCompletionItem (ci, XmlCompletionItemKind.AttributeValue));
 				}
 			}
@@ -489,7 +488,7 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 			} else {
 				//FIXME: can we avoid awaiting this unless we actually need to resolve a function? need to propagate async downwards
 				await provider.FunctionTypeProvider.EnsureInitialized (token);
-				cinfos = ExpressionCompletion.GetCompletionInfos (rr, triggerState, kind, triggerExpression, triggerLength, doc, provider.FunctionTypeProvider);
+				cinfos = ExpressionCompletion.GetCompletionInfos (rr, triggerState, kind, triggerExpression, triggerLength, doc, provider.FunctionTypeProvider, Logger);
 			}
 
 			if (cinfos != null) {

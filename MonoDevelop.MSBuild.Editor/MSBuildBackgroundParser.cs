@@ -2,46 +2,35 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.Text;
-using Microsoft.VisualStudio.Text.Projection;
+
 using MonoDevelop.MSBuild.Analysis;
 using MonoDevelop.MSBuild.Language;
-using MonoDevelop.MSBuild.Schema;
+
 using MonoDevelop.Xml.Editor;
 using MonoDevelop.Xml.Editor.Completion;
+using MonoDevelop.Xml.Editor.Logging;
 
 namespace MonoDevelop.MSBuild.Editor.Completion
 {
-	class MSBuildBackgroundParser : BackgroundProcessor<XmlParseResult,MSBuildParseResult>
+	partial class MSBuildBackgroundParser : BackgroundProcessor<XmlParseResult,MSBuildParseResult>
 	{
+		readonly ILogger logger;
+		readonly MSBuildParserProvider provider;
 		string filepath;
 
 		//FIXME: move this to a lower priority BackgroundProcessor
 		MSBuildAnalyzerDriver analyzerDriver;
 
-		public IMSBuildEnvironment RuntimeInformation { get; }
-		public MSBuildSchemaProvider SchemaProvider { get; }
-		public ITaskMetadataBuilder TaskMetadataBuilder { get; }
-
 		public XmlBackgroundParser XmlParser { get; }
 
-		public MSBuildBackgroundParser (
-			ITextBuffer buffer,
-			IMSBuildEnvironment runtimeInformation,
-			MSBuildSchemaProvider schemaProvider,
-			ITaskMetadataBuilder taskMetadataBuilder,
-			XmlParserProvider xmlParserProvider)
+		public MSBuildBackgroundParser (ITextBuffer buffer, MSBuildParserProvider provider)
 		{
-			RuntimeInformation = runtimeInformation ?? throw new ArgumentNullException (nameof (runtimeInformation));
-			SchemaProvider = schemaProvider ?? throw new ArgumentNullException (nameof (schemaProvider));
-			TaskMetadataBuilder = taskMetadataBuilder ?? throw new ArgumentNullException (nameof (taskMetadataBuilder));
-
-			XmlParser = xmlParserProvider.GetParser (buffer);
+			XmlParser = provider.XmlParserProvider.GetParser (buffer);
 			XmlParser.ParseCompleted += XmlParseCompleted;
 
 			if (buffer.Properties.TryGetProperty<ITextDocument> (typeof (ITextDocument), out var doc)) {
@@ -49,8 +38,12 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 				doc.FileActionOccurred += OnFileAction;
 			}
 
-			analyzerDriver = new MSBuildAnalyzerDriver ();
+			logger = provider.LoggerFactory.CreateLogger<MSBuildBackgroundParser> (buffer);
+
+			var analyzerDriverLogger = provider.LoggerFactory.GetLogger<MSBuildAnalyzerDriver> (buffer);
+			analyzerDriver = new MSBuildAnalyzerDriver (analyzerDriverLogger);
 			analyzerDriver.AddBuiltInAnalyzers ();
+			this.provider = provider;
 		}
 
 		void OnFileAction (object sender, TextDocumentFileActionEventArgs e)
@@ -80,9 +73,10 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 						input.TextSnapshot.GetTextSource (),
 						filepath,
 						oldDoc,
-						SchemaProvider,
-						RuntimeInformation,
-						TaskMetadataBuilder,
+						provider.SchemaProvider,
+						provider.MSBuildEnvironment,
+						provider.TaskMetadataBuilder,
+						logger,
 						token);
 
 					var analyzerDiagnostics = analyzerDriver.Analyze (doc, true, token);
@@ -90,7 +84,7 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 					doc.Diagnostics.AddRange (analyzerDiagnostics);
 				}
 				catch (Exception ex) when (!(ex is OperationCanceledException && token.IsCancellationRequested)) {
-					LoggingService.LogError ("Unhandled error in MSBuild parser", ex);
+					LogUnhandledParserError (logger, ex);
 					doc = MSBuildRootDocument.Empty;
 				}
 				// for some reason the VS debugger thinks cancellation exceptions aren't handled?
@@ -101,6 +95,9 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 				return new MSBuildParseResult (doc, doc.Diagnostics, input.TextSnapshot);
 			}, token);
 		}
+
+		[LoggerMessage (EventId = 0, Level = LogLevel.Error, Message = "Unhandled error in MSBuild parser")]
+		static partial void LogUnhandledParserError (ILogger logger, Exception ex);
 
 		protected override int CompareInputs (XmlParseResult a, XmlParseResult b)
 			=> a.TextSnapshot.Version.VersionNumber.CompareTo (b.TextSnapshot.Version.VersionNumber);

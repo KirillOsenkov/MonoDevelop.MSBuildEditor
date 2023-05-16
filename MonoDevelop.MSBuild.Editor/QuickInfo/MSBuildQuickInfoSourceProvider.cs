@@ -7,6 +7,8 @@ using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.Utilities;
 using MonoDevelop.MSBuild.Editor.Completion;
 using MonoDevelop.MSBuild.Language;
+using MonoDevelop.Xml.Editor.Logging;
+
 using ProjectFileTools.NuGetSearch.Contracts;
 
 namespace MonoDevelop.MSBuild.Editor.QuickInfo
@@ -17,19 +19,31 @@ namespace MonoDevelop.MSBuild.Editor.QuickInfo
 	[Order]
 	class MSBuildQuickInfoSourceProvider : IAsyncQuickInfoSourceProvider
 	{
-		[Import (typeof (IFunctionTypeProvider))]
-		public IFunctionTypeProvider FunctionTypeProvider { get; set; }
+		[ImportingConstructor]
+		public MSBuildQuickInfoSourceProvider (
+			IFunctionTypeProvider functionTypeProvider,
+			IPackageSearchManager packageSearchManager,
+			DisplayElementFactory displayElementFactory,
+			MSBuildParserProvider parserProvider,
+			IEditorLoggerFactory loggerFactory)
+		{
+			FunctionTypeProvider = functionTypeProvider;
+			PackageSearchManager = packageSearchManager;
+			DisplayElementFactory = displayElementFactory;
+			ParserProvider = parserProvider;
+			LoggerFactory = loggerFactory;
+		}
 
-		[Import (typeof (IPackageSearchManager))]
-		public IPackageSearchManager PackageSearchManager { get; set; }
-
-		[Import]
-		public DisplayElementFactory DisplayElementFactory { get; set; }
-
-		[Import]
-		public MSBuildParserProvider ParserProvider { get; set; }
+		public IFunctionTypeProvider FunctionTypeProvider { get; }
+		public IPackageSearchManager PackageSearchManager { get; }
+		public DisplayElementFactory DisplayElementFactory { get; }
+		public MSBuildParserProvider ParserProvider { get; }
+		public IEditorLoggerFactory LoggerFactory { get; }
 
 		public IAsyncQuickInfoSource TryCreateQuickInfoSource (ITextBuffer textBuffer)
-			=> textBuffer.Properties.GetOrCreateSingletonProperty (() => new MSBuildQuickInfoSource (textBuffer, this));
+			=> textBuffer.Properties.GetOrCreateSingletonProperty (() => {
+				var logger = LoggerFactory.CreateLogger<MSBuildQuickInfoSource> (textBuffer);
+				return new MSBuildQuickInfoSource (textBuffer, logger, this);
+			});
 	}
 }

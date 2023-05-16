@@ -10,7 +10,9 @@ using System.Threading;
 using System.Threading.Tasks;
 
 using Microsoft.CodeAnalysis;
+using Microsoft.Extensions.Logging;
 
+using MonoDevelop.MSBuild.Editor.Completion;
 using MonoDevelop.MSBuild.Language;
 using MonoDevelop.MSBuild.Language.Expressions;
 using MonoDevelop.MSBuild.Language.Typesystem;
@@ -20,26 +22,26 @@ using ISymbol = MonoDevelop.MSBuild.Language.ISymbol;
 namespace MonoDevelop.MSBuild.Editor.Roslyn
 {
 	[Export (typeof (IFunctionTypeProvider))]
-	class RoslynFunctionTypeProvider : IFunctionTypeProvider
+	partial class RoslynFunctionTypeProvider : IFunctionTypeProvider
 	{
-		[Import (AllowDefault=true)]
-		public IRoslynCompilationProvider AssemblyLoader { get; set; }
+		readonly ILogger logger;
+
+		[ImportingConstructor]
+		public RoslynFunctionTypeProvider ([Import (AllowDefault = true)] IRoslynCompilationProvider assemblyLoader, MSBuildEnvironmentLogger environmentLogger)
+			: this (assemblyLoader, environmentLogger.Logger)
+		{ }
+
+		public RoslynFunctionTypeProvider (IRoslynCompilationProvider assemblyLoader, ILogger logger)
+		{
+			AssemblyLoader = assemblyLoader;
+			this.logger = logger;
+		}
+
+		public IRoslynCompilationProvider AssemblyLoader { get; }
 
 		readonly object locker = new object ();
 		Compilation compilation;
 		Task compilationLoadTask;
-
-		public RoslynFunctionTypeProvider ()
-		{
-		}
-
-		public RoslynFunctionTypeProvider (Compilation compilation)
-		{
-			if (compilation == null) {
-				this.compilation = compilation;
-				compilationLoadTask = Task.CompletedTask;
-			}
-		}
 
 		//we need the reference assembly to get docs
 		static string GetMscorlibReferenceAssembly ()
@@ -69,7 +71,7 @@ namespace MonoDevelop.MSBuild.Editor.Roslyn
 							AssemblyLoader.CreateReference (mscorlibPath)
 						});
 				} catch (Exception ex) {
-					LoggingService.LogError ("Failed to load roslyn compilation for function completion", ex);
+					LogFailedToResolveCompilation (logger, ex);
 				}
 			});
 		}
@@ -759,5 +761,8 @@ namespace MonoDevelop.MSBuild.Editor.Roslyn
 				"CurrentUICulture"
 			} }
 		};
+
+		[LoggerMessage (EventId = 0, Level = LogLevel.Error, Message = "Failed to load Roslyn compilation for function completion")]
+		static partial void LogFailedToResolveCompilation (ILogger logger, Exception ex);
 	}
 }
