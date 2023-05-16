@@ -53,9 +53,6 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 		public IMSBuildEnvironment MSBuildEnvironment { get; }
 		public IEditorLoggerFactory LoggerFactory { get; internal set; }
 
-		[Import (typeof (XmlParserProvider), AllowDefault = true)]
-		public XmlParserProvider XmlParserProvider { get; set; }
-
 		public MSBuildBackgroundParser GetParser (ITextBuffer buffer)
 		{
 			buffer = GetSubjectBuffer (buffer);

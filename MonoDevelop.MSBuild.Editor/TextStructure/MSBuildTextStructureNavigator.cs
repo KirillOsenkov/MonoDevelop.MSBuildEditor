@@ -20,9 +20,8 @@ namespace MonoDevelop.MSBuild.Editor.TextStructure
 		readonly MSBuildTextStructureNavigatorProvider provider;
 		readonly ITextBuffer textBuffer;
 		readonly ITextStructureNavigator xmlNavigator;
-		readonly XmlParserProvider xmlParserProvider;
 
-		public MSBuildTextStructureNavigator (ITextBuffer textBuffer, MSBuildTextStructureNavigatorProvider provider, XmlParserProvider xmlParserProvider)
+		public MSBuildTextStructureNavigator (ITextBuffer textBuffer, MSBuildTextStructureNavigatorProvider provider)
 		{
 			this.textBuffer = textBuffer;
 			this.provider = provider;
@@ -30,7 +29,6 @@ namespace MonoDevelop.MSBuild.Editor.TextStructure
 				textBuffer,
 				provider.ContentTypeRegistry.GetContentType (XmlContentTypeNames.XmlCore)
 			);
-			this.xmlParserProvider = xmlParserProvider;
 		}
 
 		public IContentType ContentType => textBuffer.ContentType;

@@ -39,9 +39,6 @@ namespace MonoDevelop.MSBuild.Editor.HighlightReferences
 		public MSBuildParserProvider ParserProvider { get; }
 		public IEditorLoggerFactory LoggerService { get; }
 
-		[Import]
-		public IEditorLoggerService EditorLoggerService { get; set; }
-
 		public ITagger<T> CreateTagger<T> (ITextView textView, ITextBuffer buffer) where T : ITag
 			=>  (ITagger<T>) buffer.Properties.GetOrCreateSingletonProperty (() => {
 				var logger = LoggerService.CreateLogger<MSBuildHighlightReferencesTagger> (textView);

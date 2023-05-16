@@ -32,7 +32,6 @@ using MonoDevelop.Xml.Parser;
 using ProjectFileTools.NuGetSearch.Feeds;
 
 using static MonoDevelop.MSBuild.Language.ExpressionCompletion;
-using Microsoft.Extensions.Logging;
 
 namespace MonoDevelop.MSBuild.Editor.Completion
 {
@@ -43,8 +42,8 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 
 		public MSBuildCompletionSource (ITextView textView, MSBuildCompletionSourceProvider provider, ILogger logger) : base (textView, logger, provider.XmlParserProvider)
 		{
-			this.parserProvider = parserProvider;
 			this.provider = provider;
+			this.parserProvider = provider.ParserProvider;
 		}
 
 		class MSBuildCompletionSessionContext
@@ -199,7 +198,7 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 		{
 			//we don't care need a real document here we're doing very basic resolution for triggering
 			var spine = GetSpineParser (triggerLocation);
-			var rr = MSBuildResolver.Resolve (spine.Clone (), triggerLocation.Snapshot.GetTextSource (), MSBuildRootDocument.Empty, null, logger, token);
+			var rr = MSBuildResolver.Resolve (spine.Clone (), triggerLocation.Snapshot.GetTextSource (), MSBuildRootDocument.Empty, null, Logger, token);
 			if (rr?.ElementSyntax != null) {
 				var reason = ConvertReason (trigger.Reason, trigger.Character);
 				if (reason.HasValue && IsPossibleExpressionCompletionContext (spine)) {

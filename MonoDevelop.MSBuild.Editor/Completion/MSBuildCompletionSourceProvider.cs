@@ -47,12 +47,6 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 		public IEditorLoggerFactory LoggerService { get; }
 		public XmlParserProvider XmlParserProvider { get; }
 
-		[Import]
-		public IEditorLoggerService EditorLoggerService { get; set; }
-
-		[Import]
-		public XmlParserProvider XmlParserProvider { get; set; }
-
 		public IAsyncCompletionSource GetOrCreate (ITextView textView) =>
 			textView.Properties.GetOrCreateSingletonProperty (() => {
 				var logger = LoggerService.CreateLogger<MSBuildCompletionSource> (textView);
