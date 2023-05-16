@@ -22,7 +22,6 @@ namespace MonoDevelop.MSBuild.Editor.HighlightReferences
 {
 	class MSBuildHighlightReferencesTagger : HighlightTagger<NavigableHighlightTag, ReferenceUsage>
 	{
-		readonly MSBuildBackgroundParser parser;
 		readonly MSBuildHighlightReferencesTaggerProvider provider;
 
 		public MSBuildHighlightReferencesTagger (
@@ -31,7 +30,6 @@ namespace MonoDevelop.MSBuild.Editor.HighlightReferences
 			ILogger logger)
 			: base (textView, provider.JoinableTaskContext, logger)
 		{
-			parser = provider.ParserProvider.GetParser (textView.TextBuffer);
 			this.provider = provider;
 		}
 
@@ -42,6 +40,7 @@ namespace MonoDevelop.MSBuild.Editor.HighlightReferences
 			GetHighlightsAsync (SnapshotPoint caretLocation, CancellationToken token)
 		{
 			var snapshot = caretLocation.Snapshot;
+			var parser = provider.ParserProvider.GetParser (caretLocation.Snapshot.TextBuffer);
 			var spineParser = parser.XmlParser.GetSpineParser (caretLocation);
 			var textSource = snapshot.GetTextSource ();
 			var doc = parser.LastOutput?.MSBuildDocument;
