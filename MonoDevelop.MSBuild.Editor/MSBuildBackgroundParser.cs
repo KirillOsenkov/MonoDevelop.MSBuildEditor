@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+#nullable enable
+
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,8 +14,8 @@ using MonoDevelop.MSBuild.Analysis;
 using MonoDevelop.MSBuild.Language;
 
 using MonoDevelop.Xml.Editor;
-using MonoDevelop.Xml.Editor.Completion;
 using MonoDevelop.Xml.Editor.Logging;
+using MonoDevelop.Xml.Editor.Parsing;
 
 namespace MonoDevelop.MSBuild.Editor.Completion
 {
@@ -21,20 +23,20 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 	{
 		readonly ILogger logger;
 		readonly MSBuildParserProvider provider;
-		string filepath;
+		string? filePath;
 
 		//FIXME: move this to a lower priority BackgroundProcessor
 		MSBuildAnalyzerDriver analyzerDriver;
 
 		public XmlBackgroundParser XmlParser { get; }
 
-		public MSBuildBackgroundParser (ITextBuffer buffer, MSBuildParserProvider provider)
+		public MSBuildBackgroundParser (ITextBuffer buffer, MSBuildParserProvider provider, IBackgroundParseService parseService) : base (parseService)
 		{
 			XmlParser = provider.XmlParserProvider.GetParser (buffer);
 			XmlParser.ParseCompleted += XmlParseCompleted;
 
 			if (buffer.Properties.TryGetProperty<ITextDocument> (typeof (ITextDocument), out var doc)) {
-				filepath = doc.FilePath;
+				filePath = doc.FilePath;
 				doc.FileActionOccurred += OnFileAction;
 			}
 
@@ -46,22 +48,22 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 			this.provider = provider;
 		}
 
-		void OnFileAction (object sender, TextDocumentFileActionEventArgs e)
+		void OnFileAction (object? sender, TextDocumentFileActionEventArgs e)
 		{
-			if (e.FileActionType == FileActionTypes.DocumentRenamed) {
-				filepath = ((ITextDocument)sender).FilePath;
+			if (e.FileActionType == FileActionTypes.DocumentRenamed && sender is ITextDocument doc) {
+				filePath = doc.FilePath;
 			}
 		}
 
-		void XmlParseCompleted (object sender, ParseCompletedEventArgs<XmlParseResult> e)
+		void XmlParseCompleted (object? sender, ParseCompletedEventArgs<XmlParseResult> e)
 		{
 			StartProcessing (e.ParseResult);
 		}
 
 		protected override Task<MSBuildParseResult> StartOperationAsync (
 			XmlParseResult input,
-			MSBuildParseResult previousOutput,
-			XmlParseResult previousInput,
+			MSBuildParseResult? previousOutput,
+			XmlParseResult? previousInput,
 			CancellationToken token)
 		{
 			return Task.Run (() => {
@@ -71,7 +73,7 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 				try {
 					doc = MSBuildRootDocument.Parse (
 						input.TextSnapshot.GetTextSource (),
-						filepath,
+						filePath,
 						oldDoc,
 						provider.SchemaProvider,
 						provider.MSBuildEnvironment,
@@ -86,10 +88,6 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 				catch (Exception ex) when (!(ex is OperationCanceledException && token.IsCancellationRequested)) {
 					LogUnhandledParserError (logger, ex);
 					doc = MSBuildRootDocument.Empty;
-				}
-				// for some reason the VS debugger thinks cancellation exceptions aren't handled?
-				catch (OperationCanceledException) when (token.IsCancellationRequested) {
-					return null;
 				}
 
 				return new MSBuildParseResult (doc, doc.Diagnostics, input.TextSnapshot);
@@ -113,6 +111,6 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 			ParseCompleted?.Invoke (this, new ParseCompletedEventArgs<MSBuildParseResult> (output, output.Snapshot));
 		}
 
-		public event EventHandler<ParseCompletedEventArgs<MSBuildParseResult>> ParseCompleted;
+		public event EventHandler<ParseCompletedEventArgs<MSBuildParseResult>>? ParseCompleted;
 	}
 }

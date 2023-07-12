@@ -472,6 +472,12 @@ namespace MonoDevelop.MSBuild.Language
 					ImmutableDictionary<string, object>.Empty.Add ("Name", info.Name),
 					DescriptionFormatter.GetKindNoun (info),
 					info.Name);
+				} else {
+					foreach (var listVal in list.Nodes) {
+						if (listVal is ExpressionText listValText) {
+							VisitPureLiteral (info, kind.WithoutModifiers (), listValText.GetUnescapedValue (), listValText.Offset);
+						}
+					}
 				}
 				if (!allowExpressions) {
 					var expr = list.Nodes.FirstOrDefault (n => !(n is ExpressionText));
@@ -480,7 +486,7 @@ namespace MonoDevelop.MSBuild.Language
 					}
 				}
 			} else if (node is ExpressionText lit) {
-				VisitPureLiteral (info, kind, lit.GetUnescapedValue (), lit.Offset);
+				VisitPureLiteral (info, kind.WithoutModifiers (), lit.GetUnescapedValue (), lit.Offset);
 			} else {
 				if (!allowExpressions) {
 					AddExpressionWarning (node);
@@ -606,14 +612,17 @@ namespace MonoDevelop.MSBuild.Language
 				break;
 				*/
 			case MSBuildValueKind.Lcid:
-				if (int.TryParse (value, out int lcid) && lcid > 0) {
-					try {
-						CultureInfo.GetCultureInfo (lcid);
-					} catch (CultureNotFoundException) {
-						AddErrorWithArgs (CoreDiagnostics.UnknownLcid, value);
-					}
-				} else {
+				if (!CultureHelper.IsValidLcid (value, out int lcid)) {
 					AddErrorWithArgs (CoreDiagnostics.InvalidLcid, value);
+				} else if (!CultureHelper.IsKnownLcid (lcid)) {
+					AddErrorWithArgs (CoreDiagnostics.UnknownLcid, value);
+				}
+				break;
+			case MSBuildValueKind.Culture:
+				if (!CultureHelper.IsValidCultureName (value)) {
+					AddErrorWithArgs (CoreDiagnostics.InvalidCulture, value);
+				} else if (!CultureHelper.IsKnownCulture (value)) {
+					AddErrorWithArgs (CoreDiagnostics.UnknownCulture, value);
 				}
 				break;
 			case MSBuildValueKind.TargetFramework:

@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+
 using MonoDevelop.MSBuild.Language;
 using MonoDevelop.MSBuild.Language.Syntax;
 using MonoDevelop.MSBuild.Language.Typesystem;
@@ -92,7 +93,7 @@ namespace MonoDevelop.MSBuild.Schema
 			case FileOrFolderInfo value:
 				return (value.IsFolder? "folder" : "file", info.Name);
 			case FrameworkInfo fxi:
-				return ("framework", fxi.Reference.DotNetFrameworkName);
+				return ("framework", FrameworkInfoProvider.Instance.FormatNameForTitle (fxi.Reference));
 			case TaskParameterInfo tpi:
 				return ("parameter", tpi.Name);
 			case FunctionInfo fi:
@@ -181,6 +182,8 @@ namespace MonoDevelop.MSBuild.Schema
 				return "version-suffixed";
 			case MSBuildValueKind.Lcid:
 				return "lcid";
+			case MSBuildValueKind.Culture:
+				return "culture";
 			case MSBuildValueKind.DateTime:
 				return "datetime";
 			case MSBuildValueKind.Char:

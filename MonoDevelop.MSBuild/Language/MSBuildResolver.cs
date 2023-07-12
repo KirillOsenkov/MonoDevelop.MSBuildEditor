@@ -8,13 +8,12 @@ using System.Threading;
 
 using Microsoft.Extensions.Logging;
 
-using MonoDevelop.Xml.Dom;
-using MonoDevelop.Xml.Parser;
-
 using MonoDevelop.MSBuild.Language.Expressions;
 using MonoDevelop.MSBuild.Language.Syntax;
-using MonoDevelop.MSBuild.Schema;
 using MonoDevelop.MSBuild.Language.Typesystem;
+using MonoDevelop.MSBuild.Schema;
+using MonoDevelop.Xml.Dom;
+using MonoDevelop.Xml.Parser;
 
 namespace MonoDevelop.MSBuild.Language
 {
@@ -297,6 +296,9 @@ namespace MonoDevelop.MSBuild.Language
 			void VisitPureLiteral (XElement element, ITypedSymbol valueDescriptor, MSBuildValueKind inferredKind, ExpressionText node)
 			{
 				string value = node.GetUnescapedValue ();
+				if (string.IsNullOrEmpty(value)) {
+					return;
+				}
 				rr.ReferenceOffset = node.Offset;
 				rr.ReferenceLength = node.Value.Length;
 				rr.Reference = value;
@@ -342,6 +344,18 @@ namespace MonoDevelop.MSBuild.Language
 					if (itemName != null) {
 						rr.Reference = (itemName.Name, value);
 						rr.ReferenceKind = MSBuildReferenceKind.Metadata;
+					}
+					return;
+				case MSBuildValueKind.Lcid:
+					if (CultureHelper.TryGetLcidSymbol (value, out ISymbol lcidSymbol)) {
+						rr.ReferenceKind = MSBuildReferenceKind.KnownValue;
+						rr.Reference = lcidSymbol;
+					}
+					break;
+				case MSBuildValueKind.Culture:
+					if (CultureHelper.TryGetCultureSymbol (value, out ISymbol cultureSymbol)) {
+						rr.ReferenceKind = MSBuildReferenceKind.KnownValue;
+						rr.Reference = cultureSymbol;
 					}
 					return;
 				}

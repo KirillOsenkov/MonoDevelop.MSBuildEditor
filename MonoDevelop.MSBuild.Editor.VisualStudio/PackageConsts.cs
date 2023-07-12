@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System;
+
 namespace MonoDevelop.MSBuild.Editor.VisualStudio
 {
 	class PackageConsts
@@ -9,9 +11,12 @@ namespace MonoDevelop.MSBuild.Editor.VisualStudio
 		public const string PackageVersion = ThisAssembly.AssemblyInformationalVersion;
 
 		public const string LanguageServiceGuid = "111E2ECB-9E5F-4945-9D21-D4E5368D620B";
+		public const string EditorFactoryGuid = "4C9BC7A2-907A-44AA-99EA-D1B57B1A20F8";
 
 		public const string LanguageServiceName = "MSBuild";
 		public const string LanguageServiceKey = @"Languages\Language Services\" + LanguageServiceName;
+
+		public const string TelemetryOptionsPageGuid = "87B7A322-33D9-40C2-B56A-876C38111DE9";
 	}
 
 	class PackageResxId
@@ -36,5 +41,25 @@ namespace MonoDevelop.MSBuild.Editor.VisualStudio
 		/// </summary>
 		public const int PackageDescription = 112;
 		public const string PackageDescriptionStr = "#112";
+
+		/// <summary>
+		/// General options page name
+		/// </summary>
+		public const int TelemetryOptionsPageName = 113;
+		public const string GeneralOptionsPageNameStr = "#113";
+
+		/// <summary>
+		/// General options page keywords
+		/// </summary>
+		public const int TelemetryOptionsPageKeywords = 114;
+		public const string GeneralOptionsPageKeywordsStr = "#114";
+	}
+
+	class PackageGuids
+	{
+		public static readonly Guid Package = new(PackageConsts.PackageGuid);
+		public static readonly Guid LanguageService = new(PackageConsts.LanguageServiceGuid);
+		public static readonly Guid EditorFactory = new(PackageConsts.EditorFactoryGuid);
+		public static readonly Guid TelemetryOptionsPage = new(PackageConsts.TelemetryOptionsPageGuid);
 	}
 }
