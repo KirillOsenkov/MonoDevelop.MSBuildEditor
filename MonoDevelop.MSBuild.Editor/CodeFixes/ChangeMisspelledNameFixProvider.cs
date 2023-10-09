@@ -59,8 +59,8 @@ namespace MonoDevelop.MSBuild.Editor.CodeFixes
 				case CoreDiagnostics.UnreadProperty_Id:
 				case CoreDiagnostics.UnwrittenProperty_Id:
 					foreach (var prop in await spellChecker.FindSimilarProperties (context.Document, name)) {
-						// don't fix writes with reserved properties
-						if (prop.Reserved && diag.Descriptor.Id == CoreDiagnostics.UnreadMetadata.Id) {
+						// don't fix writes with readonly properties
+						if (prop.IsReadOnly && diag.Descriptor.Id == CoreDiagnostics.UnreadMetadata.Id) {
 							continue;
 						}
 						context.RegisterCodeFix (new FixNameAction (spans, name, prop.Name), diag);
@@ -82,7 +82,7 @@ namespace MonoDevelop.MSBuild.Editor.CodeFixes
 				case CoreDiagnostics.UnknownValue_Id:
 				case CoreDiagnostics.InvalidBool_Id:
 					var kind = (MSBuildValueKind)diag.Properties["ValueKind"];
-					var customType = (CustomTypeInfo)diag.Properties["CustomType"];
+					CustomTypeInfo customType = kind == MSBuildValueKind.CustomType? (CustomTypeInfo)diag.Properties["CustomType"] : null;
 					foreach (var value in await spellChecker.FindSimilarValues (context.Document, kind, customType, name)) {
 						context.RegisterCodeFix (new FixNameAction (spans, name, value.Name), diag);
 					}

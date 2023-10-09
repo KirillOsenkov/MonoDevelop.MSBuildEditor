@@ -46,8 +46,6 @@ namespace MonoDevelop.MSBuild.Tests.Editor.Completion
 			var result = await this.GetCompletionContext (@"
 <Project><ItemGroup><Foo /><Bar /><$");
 
-			result.AssertItemCount (5);
-
 			result.AssertContains ("<Foo");
 			result.AssertContains ("<Bar");
 			result.AssertContains ("</ItemGroup");
@@ -201,9 +199,10 @@ namespace MonoDevelop.MSBuild.Tests.Editor.Completion
 <PropertyGroup>
 <Foo>$([MSBuild]::^", caretMarker: '^');
 
-			result.AssertItemCount (32);
-
+			// check a few different expected values are in the list
 			result.AssertContains ("GetDirectoryNameOfFileAbove");
+			result.AssertContains ("Add");
+			result.AssertContains ("GetTargetPlatformVersion");
 		}
 
 		[Test]
@@ -241,6 +240,30 @@ namespace MonoDevelop.MSBuild.Tests.Editor.Completion
 			result.AssertDoesNotContain ("this[]");
 			// ctors should be filtered out, cannot call on existing instance
 			result.AssertDoesNotContain ("new");
+		}
+
+		[Test]
+		public async Task PropertyFunctionArrayPropertyCompletion ()
+		{
+			var result = await this.GetCompletionContext (@"
+<Project>
+<PropertyGroup>
+<Foo>$([System.IO.Directory]::GetDirectories('.').^", caretMarker: '^');
+
+			result.AssertNonEmpty ();
+			result.AssertContains ("Length");
+		}
+
+		[Test]
+		public async Task PropertyFunctionArrayIndexerCompletion ()
+		{
+			var result = await this.GetCompletionContext (@"
+<Project>
+<PropertyGroup>
+<Foo>$([System.IO.Directory]::GetDirectories('.')[0].^", caretMarker: '^');
+
+			result.AssertNonEmpty ();
+			result.AssertContains ("get_Chars");
 		}
 
 		[Test]

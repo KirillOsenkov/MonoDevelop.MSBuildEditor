@@ -32,7 +32,9 @@ namespace MonoDevelop.MSBuild
 			toolset = projectCollection.GetToolset (projectCollection.DefaultToolsVersion);
 
 			ToolsetProperties = GetToolsetProperties (toolset);
-			ProjectImportSearchPaths = GetImportSearchPaths (toolset);
+			ProjectImportSearchPaths = GetImportSearchPaths (toolset, logger);
+
+			EnvironmentVariables = GetEnvironmentVariables ();
 
 			sdkResolver = new MSBuildSdkResolver (this, logger);
 			this.logger = logger;
@@ -46,6 +48,8 @@ namespace MonoDevelop.MSBuild
 		public Version EngineVersion => ProjectCollection.Version;
 
 		public IReadOnlyDictionary<string, string> ToolsetProperties { get; }
+
+		public IReadOnlyDictionary<string, string> EnvironmentVariables { get; init; }
 
 		public IReadOnlyDictionary<string, string[]> ProjectImportSearchPaths { get; }
 
@@ -77,29 +81,49 @@ namespace MonoDevelop.MSBuild
 			return toolsetProperties;
 		}
 
-		static Dictionary<string, string[]> GetImportSearchPaths (Toolset toolset)
+		static Dictionary<string, string> GetEnvironmentVariables ()
 		{
-			var dictProp = toolset.GetType ().GetProperty ("ImportPropertySearchPathsTable", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-			var dict = (IDictionary)dictProp.GetValue (toolset);
-			var importPathsType = typeof (ProjectCollection).Assembly.GetType ("Microsoft.Build.Evaluation.ProjectImportPathMatch");
-			var pathsField = importPathsType.GetField ("SearchPaths", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
-				// in MSBuild15 'SearchPaths' is a public property, and '_searchPaths' is the backing field
-				?? importPathsType.GetField ("_searchPaths", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+			var environmentVariables = new Dictionary<string, string> (StringComparer.OrdinalIgnoreCase);
 
-			var converted = new Dictionary<string, string[]> (StringComparer.OrdinalIgnoreCase);
-			var enumerator = dict.GetEnumerator ();
-			while (enumerator.MoveNext ()) {
-				if (enumerator.Value == null) {
-					continue;
-				}
-				var key = (string)enumerator.Key;
-				var val = (List<string>)pathsField.GetValue (enumerator.Value);
-				converted.Add (key, val.ToArray ());
+			foreach (DictionaryEntry envVar in Environment.GetEnvironmentVariables ()) {
+				environmentVariables.Add ((string)envVar.Key, (string)envVar.Value);
 			}
+
+			return environmentVariables;
+		}
+
+		static Dictionary<string, string[]> GetImportSearchPaths (Toolset toolset, ILogger logger)
+		{
+			var converted = new Dictionary<string, string[]> (StringComparer.OrdinalIgnoreCase);
+
+			try {
+				var dictProp = toolset.GetType ().GetProperty ("ImportPropertySearchPathsTable", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+				var dict = (IDictionary)dictProp.GetValue (toolset);
+				var importPathsType = typeof (ProjectCollection).Assembly.GetType ("Microsoft.Build.Evaluation.ProjectImportPathMatch");
+				var pathsField = importPathsType.GetField ("SearchPaths", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance)
+					// in MSBuild15 'SearchPaths' is a public property, and '_searchPaths' is the backing field
+					?? importPathsType.GetField ("_searchPaths", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+
+				var enumerator = dict.GetEnumerator ();
+				while (enumerator.MoveNext ()) {
+					if (enumerator.Value == null) {
+						continue;
+					}
+					var key = (string)enumerator.Key;
+					var val = (List<string>)pathsField.GetValue (enumerator.Value);
+					converted.Add (key, val.ToArray ());
+				}
+			} catch (Exception ex) {
+				LogUnhandledErrorInToolsetSearchPaths (logger, ex);
+			}
+
 			return converted;
 		}
 
 		[LoggerMessage (EventId = 0, Level = LogLevel.Error, Message = "Unhandled error in SDK resolver")]
 		static partial void LogUnhandledErrorInSdkResolver (ILogger logger, Exception ex);
+
+		[LoggerMessage (EventId = 1, Level = LogLevel.Error, Message = "Unhandled error getting toolset search paths")]
+		static partial void LogUnhandledErrorInToolsetSearchPaths (ILogger logger, Exception ex);
 	}
 }

@@ -11,9 +11,11 @@ using System.Threading;
 
 using Microsoft.Extensions.Logging;
 
+using MonoDevelop.MSBuild.Dom;
 using MonoDevelop.MSBuild.Evaluation;
 using MonoDevelop.MSBuild.Language.Expressions;
 using MonoDevelop.MSBuild.Schema;
+using MonoDevelop.MSBuild.Workspace;
 using MonoDevelop.Xml.Dom;
 using MonoDevelop.Xml.Parser;
 
@@ -24,6 +26,7 @@ namespace MonoDevelop.MSBuild.Language
 	partial class MSBuildRootDocument : MSBuildDocument, IEnumerable<IMSBuildSchema>
 	{
 		MSBuildToolsVersion? toolsVersion;
+		MSBuildSchema[] fallbackSchemas;
 
 		public IReadOnlyList<NuGetFramework> Frameworks { get; private set; }
 		public ITextSource Text { get; private set; }
@@ -88,11 +91,7 @@ namespace MonoDevelop.MSBuild.Language
 				schemaProvider,
 				token);
 
-			if (filePath != null) {
-				doc.FileEvaluationContext = new MSBuildFileEvaluationContext (parseContext.RuntimeEvaluationContext, logger, filePath, filePath);
-			} else {
-				doc.FileEvaluationContext = parseContext.RuntimeEvaluationContext;
-			}
+			doc.FileEvaluationContext = MSBuildFileEvaluationContext.Create (parseContext.ProjectEvaluationContext, logger, filePath);
 
 			string MakeRelativeMSBuildPathAbsolute (string path)
 			{
@@ -101,12 +100,12 @@ namespace MonoDevelop.MSBuild.Language
 				return Path.GetFullPath (Path.Combine (dir, path));
 			}
 
-			Import TryImportFile (string label, string possibleFile)
+			Import TryAddImport (string label, string possibleFile, bool isImplicitImport)
 			{
 				try {
 					var fi = new FileInfo (possibleFile);
 					if (fi.Exists) {
-						var imp = parseContext.GetCachedOrParse (label, possibleFile, null, null, fi.LastWriteTimeUtc);
+						var imp = parseContext.GetCachedOrParse (label, possibleFile, null, null, fi.LastWriteTimeUtc, isImplicitImport);
 						doc.AddImport (imp);
 						return imp;
 					}
@@ -116,29 +115,36 @@ namespace MonoDevelop.MSBuild.Language
 				return null;
 			}
 
-			Import TryImportSibling (string ifHasThisExtension, string thenTryThisExtension)
+			Import TryImportSibling (MSBuildFileKind ifThisKind, string thenTryThisExtension)
 			{
-				if (filePath == null) {
+				if (doc.FileKind != ifThisKind || filePath is null) {
 					return null;
 				}
-				var extension = Path.GetExtension (filePath);
-				if (string.Equals (ifHasThisExtension, extension, StringComparison.OrdinalIgnoreCase)) {
-					var siblingFilename = Path.ChangeExtension (filePath, thenTryThisExtension);
-					return TryImportFile ("(implicit)", siblingFilename);
-				}
-				return null;
+
+				var siblingFilename = Path.ChangeExtension (filePath, thenTryThisExtension);
+				return TryAddImport ("(implicit)", siblingFilename, true);
 			}
 
 			void TryImportIntellisenseImports (MSBuildSchema schema)
 			{
 				foreach (var intellisenseImport in schema.IntelliSenseImports) {
-					TryImportFile ("(from schema)", MakeRelativeMSBuildPathAbsolute (intellisenseImport));
+					TryAddImport ("(from schema)", MakeRelativeMSBuildPathAbsolute (intellisenseImport), false);
+				}
+			}
+
+			void TryAddTasksImport (MSBuildParserContext context, string label, string filename)
+			{
+				try {
+					var import = context.GetCachedOrParse (label, filename, null, null, File.GetLastWriteTimeUtc (filename), true);
+					doc.AddImport (import);
+				} catch (Exception ex) when (context.IsNotCancellation (ex)) {
+					LogUnhandledErrorResolvingTasksFile (context.Logger, ex, filename);
 				}
 			}
 
 			try {
-				//if this is a targets file, try to import the props _at the top_
-				var propsImport = TryImportSibling (".targets", ".props");
+				//if this is a targets file, try to import the sibling props file at the top_
+				var propsImport = TryImportSibling (MSBuildFileKind.Targets, MSBuildFileExtension.props);
 
 				// this currently only happens in the root file
 				// it's a quick hack to allow files to get some basic intellisense by
@@ -152,8 +158,13 @@ namespace MonoDevelop.MSBuild.Language
 
 				doc.Build (xdocument, parseContext);
 
-				//if this is a props file, try to import the targets _at the bottom_
-				var targetsImport = TryImportSibling (".props", ".targets");
+				// if we didn't find any explicit imports, add some default schemas and imports
+				if (!doc.Imports.Any (imp => !imp.IsImplicitImport)) {
+					AddFallbackImports (doc, parseContext);
+				}
+
+				//if this is a props file, try to import the sibling targets file _at the bottom_
+				var targetsImport = TryImportSibling (MSBuildFileKind.Props, MSBuildFileExtension.targets);
 
 				//and if we didn't load intellisense import already, try to load them from the sibling targets
 				if (schema == null && targetsImport?.Document?.Schema != null) {
@@ -166,10 +177,10 @@ namespace MonoDevelop.MSBuild.Language
 			try {
 				var env = parseContext.Environment;
 				foreach (var t in env.EnumerateFilesInToolsPath ("*.tasks")) {
-					doc.LoadTasks (parseContext, "(core tasks)", t);
+					TryAddTasksImport (parseContext, "(core tasks)", t);
 				}
 				foreach (var t in env.EnumerateFilesInToolsPath ("*.overridetasks")) {
-					doc.LoadTasks (parseContext, "(core overridetasks)", t);
+					TryAddTasksImport (parseContext, "(core overridetasks)", t);
 				}
 			} catch (Exception ex) when (parseContext.IsNotCancellation (ex)) {
 				LogUnhandledErrorResolvingTasksFiles (logger, ex);
@@ -203,14 +214,26 @@ namespace MonoDevelop.MSBuild.Language
 			return doc;
 		}
 
-		void LoadTasks (MSBuildParserContext context, string label, string filename)
+		static void AddFallbackImports (MSBuildRootDocument doc, MSBuildParserContext parseContext)
 		{
-			try {
-				var import = context.GetCachedOrParse (label, filename, null, null, File.GetLastWriteTimeUtc (filename));
-				AddImport (import);
-			} catch (Exception ex) when (context.IsNotCancellation (ex)) {
-				LogUnhandledErrorResolvingTasksFile (context.Logger, ex, filename);
+			var sdkPropsExpr = new ExpressionText (0, "Sdk.props", true);
+			var sdkTargetsExpr = new ExpressionText (0, "Sdk.targets", true);
+			var importResolver = parseContext.CreateImportResolver (doc.Filename);
+
+			void AddSdkImport (ExpressionText importExpr, string importText, string sdkString, SdkResolution.SdkInfo sdk, bool isImplicit = false)
+			{
+				foreach (var sdkImport in importResolver.Resolve (importExpr, importText, sdkString, sdk, isImplicit)) {
+					doc.AddImport (sdkImport);
+				}
 			}
+
+			var defaultSdk = parseContext.ResolveSdk (doc, "Microsoft.NET.Sdk", doc.ProjectElement.XElement.NameSpan);
+			if (defaultSdk is not null) {
+				AddSdkImport (sdkPropsExpr, "(implicit)", defaultSdk.Name, defaultSdk, false);
+				AddSdkImport (sdkTargetsExpr, "(implicit)", defaultSdk.Name, defaultSdk, false);
+			}
+
+			doc.fallbackSchemas = parseContext.PreviousRootDocument?.fallbackSchemas ?? BuiltInSchema.GetAllBuiltInFileSchemas ().ToArray ();
 		}
 
 		//hack for MSBuildParserContext to access
@@ -259,6 +282,36 @@ namespace MonoDevelop.MSBuild.Language
 
 				toolsVersion = MSBuildToolsVersion.Unknown;
 				return toolsVersion.Value;
+			}
+		}
+
+
+		bool UsesLegacyProjectSystem () =>
+			// perform series of progressively more expensive checks to see if this uses the Managed Project System
+			// so that we optimize perf for SDK-format projects
+			ProjectElement.SdkAttribute is null
+			&& ProjectElement.GetAttribute (Syntax.MSBuildSyntaxKind.Project_xmlns) is not null
+			&& ProjectElement.GetAttribute (Syntax.MSBuildSyntaxKind.Project_ToolsVersion) is not null
+			&& ProjectElement.GetElements<MSBuildPropertyGroupElement> ()
+				.Any (pg => pg.GetElements<MSBuildPropertyElement> ()
+					.Any (p => p.IsElementNamed ("ProjectGuid")));
+
+		public override IEnumerable<IMSBuildSchema> GetSchemas (bool skipThisDocumentInferredSchema = false)
+		{
+			if (FileKind.IsProject () && UsesLegacyProjectSystem ()) {
+				yield return BuiltInSchema.ProjectSystemMpsSchema;
+			} else {
+				yield return BuiltInSchema.ProjectSystemCpsSchema;
+			}
+
+			foreach (var baseSchema in base.GetSchemas (skipThisDocumentInferredSchema)) {
+				yield return baseSchema;
+			}
+
+			if (fallbackSchemas is not null) {
+				foreach (var schema in fallbackSchemas) {
+					yield return schema;
+				}
 			}
 		}
 

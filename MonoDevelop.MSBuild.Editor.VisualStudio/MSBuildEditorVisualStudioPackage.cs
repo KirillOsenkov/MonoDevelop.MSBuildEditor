@@ -14,6 +14,7 @@ using Microsoft.VisualStudio.Shell.Interop;
 
 using MonoDevelop.MSBuild.Editor.VisualStudio.Logging;
 using MonoDevelop.MSBuild.Editor.VisualStudio.Options;
+using MonoDevelop.MSBuild.Workspace;
 using MonoDevelop.Xml.Logging;
 
 using Task = System.Threading.Tasks.Task;
@@ -46,8 +47,10 @@ namespace MonoDevelop.MSBuild.Editor.VisualStudio
 	[ProvideLanguageExtension (typeof (MSBuildLanguageService), MSBuildFileExtension.fsproj)]
 	[ProvideLanguageExtension (typeof (MSBuildLanguageService), MSBuildFileExtension.xproj)]
 	[ProvideLanguageExtension (typeof (MSBuildLanguageService), MSBuildFileExtension.vcxproj)]
+	[ProvideLanguageExtension (typeof (MSBuildLanguageService), MSBuildFileExtension.sfxproj)]
 	[ProvideLanguageExtension (typeof (MSBuildLanguageService), MSBuildFileExtension.proj)]
 	[ProvideLanguageExtension (typeof (MSBuildLanguageService), MSBuildFileExtension.user)]
+	[ProvideLanguageExtension (typeof (MSBuildLanguageService), MSBuildFileExtension.pubxml)]
 
 	[ProvideEditorFactory (typeof (MSBuildEditorFactory), PackageResxId.EditorName, deferUntilIntellisenseIsReady: false, CommonPhysicalViewAttributes = (int)__VSPHYSICALVIEWATTRIBUTES.PVA_SupportsPreview)]
 	[ProvideEditorLogicalView (typeof (MSBuildEditorFactory), VSConstants.LOGVIEWID.TextView_string)]
@@ -63,8 +66,10 @@ namespace MonoDevelop.MSBuild.Editor.VisualStudio
 	[ProvideEditorExtension (typeof (MSBuildEditorFactory), MSBuildFileExtension.fsproj, 65535)]
 	[ProvideEditorExtension (typeof (MSBuildEditorFactory), MSBuildFileExtension.xproj, 65535)]
 	[ProvideEditorExtension (typeof (MSBuildEditorFactory), MSBuildFileExtension.vcxproj, 65535)]
+	[ProvideEditorExtension (typeof (MSBuildEditorFactory), MSBuildFileExtension.sfxproj, 65535)]
 	[ProvideEditorExtension (typeof (MSBuildEditorFactory), MSBuildFileExtension.proj, 65535)]
 	[ProvideEditorExtension (typeof (MSBuildEditorFactory), MSBuildFileExtension.user, 65535)]
+	[ProvideEditorExtension (typeof (MSBuildEditorFactory), MSBuildFileExtension.pubxml, 65535)]
 
 	[ProvideOptionPage(typeof(MSBuildTelemetryOptionsPage), "MSBuild Editor", "Telemetry", PackageResxId.EditorName, PackageResxId.TelemetryOptionsPageName, false, PackageResxId.TelemetryOptionsPageKeywords)]
 	[ProvideProfile(typeof(MSBuildTelemetryOptionsPage), "MSBuild Editor", "Telemetry", PackageResxId.EditorName, PackageResxId.TelemetryOptionsPageName, false)]
