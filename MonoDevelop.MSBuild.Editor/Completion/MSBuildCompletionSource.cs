@@ -56,8 +56,8 @@ namespace MonoDevelop.MSBuild.Editor.Completion
 		// in GetElementCompletionsAsync or GetAttributeCompletionsAsync
 		async Task<MSBuildCompletionSessionContext> CreateMSBuildSessionContext (IAsyncCompletionSession session, SnapshotPoint triggerLocation, CancellationToken token)
 		{
-            var parser = provider.ParserProvider.GetParser(triggerLocation.Snapshot.TextBuffer);
-            MSBuildParseResult parseResult = parser.LastOutput ?? await parser.GetOrProcessAsync (triggerLocation.Snapshot, token);
+			var parser = provider.ParserProvider.GetParser(triggerLocation.Snapshot.TextBuffer);
+			MSBuildParseResult parseResult = parser.LastOutput ?? await parser.GetOrProcessAsync (triggerLocation.Snapshot, token);
 			var doc = parseResult.MSBuildDocument ?? MSBuildRootDocument.Empty;
 			var spine = GetSpineParser (triggerLocation);
 			// clone the spine because the resolver alters it
