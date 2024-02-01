@@ -19,7 +19,7 @@ namespace MonoDevelop.MSBuild.Language.Syntax {
     // class via a tool like ResGen or Visual Studio.
     // To add or remove a member, edit your .ResX file then rerun ResGen
     // with the /str option, or rebuild your VS project.
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "16.0.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "17.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
     internal class ElementDescriptions {
@@ -709,6 +709,33 @@ namespace MonoDevelop.MSBuild.Language.Syntax {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to References an MSBuild project SDK, adding an implicit import to the top and bottom of the project.
+        /// </summary>
+        internal static string Sdk {
+            get {
+                return ResourceManager.GetString("Sdk", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The name of the MSBuild project SDK.
+        /// </summary>
+        internal static string Sdk_Name {
+            get {
+                return ResourceManager.GetString("Sdk.Name", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Optional version of the MSBuild project SDK.
+        /// </summary>
+        internal static string Sdk_Version {
+            get {
+                return ResourceManager.GetString("Sdk.Version", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Groups tasks into a section of the build process.
         /// </summary>
         internal static string Target {
@@ -718,7 +745,7 @@ namespace MonoDevelop.MSBuild.Language.Syntax {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Optional semi-colon separated list of targets that this target should run before..
+        ///   Looks up a localized string similar to Targets after which this target should run. Note that if any `BeforeTargets` targets are encountered before any of the `AfterTargets` targets, or if this is a `DependsOnTargets` of a target that is encountered before any of the `AfterTargets`, this target will be executed before *all* of the `AfterTargets` target. Also, if multiple `AfterTargets` targets are specified, this target will be executed after the first `AfterTargets` target that is encountered, not after all of them have been encountered..
         /// </summary>
         internal static string Target_AfterTargets {
             get {
@@ -727,7 +754,7 @@ namespace MonoDevelop.MSBuild.Language.Syntax {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Optional semi-colon separated list of targets that this target should run before..
+        ///   Looks up a localized string similar to Targets before which this target should run. This target will execute before the first of the `BeforeTargets` targets that is encountered. If none of the `BeforeTargets` or `AfterTargets` are encountered and this is not a `DependsOnTargets` of a target that is encountered, this target will not execute. .
         /// </summary>
         internal static string Target_BeforeTargets {
             get {
@@ -745,7 +772,7 @@ namespace MonoDevelop.MSBuild.Language.Syntax {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Optional semi-colon separated list of targets that should be run before this target.
+        ///   Looks up a localized string similar to Targets that should be run before this target. When this target is encountered, all of its `DependOnTargets` targets will be run, which may cause them to run before any `AfterTargets` targets that they define..
         /// </summary>
         internal static string Target_DependsOnTargets {
             get {
@@ -754,7 +781,7 @@ namespace MonoDevelop.MSBuild.Language.Syntax {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Optional semi-colon separated list of files that form inputs into this target. Their timestamps will be compared with the timestamps of files in Outputs to determine whether the Target is up to date.
+        ///   Looks up a localized string similar to Files that form inputs into this target. Their timestamps will be compared with the timestamps of files in `Outputs` to determine whether the target is up to date..
         /// </summary>
         internal static string Target_Inputs {
             get {
@@ -790,7 +817,7 @@ namespace MonoDevelop.MSBuild.Language.Syntax {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Optional semi-colon separated list of files that form outputs into this target. Their timestamps will be compared with the timestamps of files in Inputs to determine whether the Target is up to date.
+        ///   Looks up a localized string similar to Files that form outputs into this target. Their timestamps will be compared with the timestamps of files in `Inputs` to determine whether the target is up to date.
         /// </summary>
         internal static string Target_Outputs {
             get {
@@ -799,7 +826,7 @@ namespace MonoDevelop.MSBuild.Language.Syntax {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Optional expression evaluated to determine which items generated by the target should be returned by the target. If there are no Returns attributes on Targets in the file, the Outputs attributes are used instead for this purpose..
+        ///   Looks up a localized string similar to Expression evaluated to determine which items generated by the target should be returned by the target. If is are no `Returns` attribute on the target, the `Outputs` attribute is used instead for this purpose..
         /// </summary>
         internal static string Target_Returns {
             get {
@@ -826,7 +853,7 @@ namespace MonoDevelop.MSBuild.Language.Syntax {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Optional expression evaluated to determine whether the task should be executed.
+        ///   Looks up a localized string similar to Expression evaluated to determine whether the task should be executed when it is encountered..
         /// </summary>
         internal static string Task_Condition {
             get {
@@ -835,7 +862,7 @@ namespace MonoDevelop.MSBuild.Language.Syntax {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Optional boolean indicating whether a recoverable task error should be ignored. Default false.
+        ///   Looks up a localized string similar to Indicates whether a recoverable task error should be ignored..
         /// </summary>
         internal static string Task_ContinueOnError {
             get {

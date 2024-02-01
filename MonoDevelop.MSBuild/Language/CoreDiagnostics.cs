@@ -129,14 +129,6 @@ namespace MonoDevelop.MSBuild.Language
 			MSBuildDiagnosticSeverity.Warning
 		);
 
-		public const string Deprecated_Id = nameof(Deprecated);
-		public static readonly MSBuildDiagnosticDescriptor Deprecated = new (
-			Deprecated_Id,
-			"Deprecated {0}",
-			"The {0} `{1}` is deprecated",
-			MSBuildDiagnosticSeverity.Warning
-		);
-
 		public const string DeprecatedWithMessage_Id = nameof(DeprecatedWithMessage);
 		public static readonly MSBuildDiagnosticDescriptor DeprecatedWithMessage = new (
 			DeprecatedWithMessage_Id,
@@ -458,6 +450,34 @@ namespace MonoDevelop.MSBuild.Language
 			"The value `{0}` is not a valid version format",
 			MSBuildDiagnosticSeverity.Error);
 
+		public const string InvalidVersionSuffixed_Id = nameof (InvalidVersionSuffixed);
+		public static readonly MSBuildDiagnosticDescriptor InvalidVersionSuffixed = new (
+			InvalidVersionSuffixed_Id,
+			"Invalid suffixed version format",
+			"The value `{0}` is not a valid suffixed version format",
+			MSBuildDiagnosticSeverity.Error);
+
+		public const string InvalidClrNamespace_Id = nameof (InvalidClrNamespace);
+		public static readonly MSBuildDiagnosticDescriptor InvalidClrNamespace = new (
+			InvalidClrNamespace_Id,
+			"Invalid .NET namespace",
+			"The value `{0}` is not a valid .NET namespace string",
+			MSBuildDiagnosticSeverity.Error);
+
+		public const string InvalidClrType_Id = nameof (InvalidClrType);
+		public static readonly MSBuildDiagnosticDescriptor InvalidClrType = new (
+			InvalidClrType_Id,
+			"Invalid qualified .NET type name",
+			"The value `{0}` is not a valid qualified .NET type name string",
+			MSBuildDiagnosticSeverity.Error);
+
+		public const string InvalidClrTypeName_Id = nameof (InvalidClrTypeName);
+		public static readonly MSBuildDiagnosticDescriptor InvalidClrTypeName = new (
+			InvalidClrTypeName_Id,
+			"Invalid unqualified .NET type name",
+			"The value `{0}` is not a valid qualified .NET type name string",
+			MSBuildDiagnosticSeverity.Error);
+
 		public const string UnknownTargetFramework_Id = nameof(UnknownTargetFramework);
 		public static readonly MSBuildDiagnosticDescriptor UnknownTargetFramework = new (
 			UnknownTargetFramework_Id,
@@ -505,154 +525,6 @@ namespace MonoDevelop.MSBuild.Language
 			ItemMustHaveInclude_Id,
 			"Item has no Include, Update or Remove attribute",
 			"Items outside targets must have Include, Update or Remove attribute",
-			MSBuildDiagnosticSeverity.Error);
-
-		public static (MSBuildDiagnosticDescriptor, object[]) GetExpressionError (ExpressionError error, ITypedSymbol info)
-		{
-			(MSBuildDiagnosticDescriptor, object[]) Return (MSBuildDiagnosticDescriptor desc, params object[] args) => (desc, args);
-			return error.Kind switch
-			{
-				ExpressionErrorKind.MetadataDisallowed => Return (MetadataDisallowed, DescriptionFormatter.GetKindNoun (info), info.Name),
-				ExpressionErrorKind.EmptyListEntry => Return (EmptyListValue),
-				ExpressionErrorKind.ExpectingItemName => Return (ExpectingItemName),
-				ExpressionErrorKind.ExpectingRightParen => Return (ExpectingChar, ')'),
-				ExpressionErrorKind.ExpectingRightParenOrPeriod => Return (ExpectingCharOrChar, ')', '.'),
-				ExpressionErrorKind.ExpectingPropertyName => Return (ExpectingPropertyName),
-				ExpressionErrorKind.ExpectingMetadataName => Return (ExpectingMetadataName),
-				ExpressionErrorKind.ExpectingMetadataOrItemName => Return (ExpectingMetadataOrItemName),
-				ExpressionErrorKind.ExpectingRightAngleBracket => Return (ExpectingChar, '>'),
-				ExpressionErrorKind.ExpectingRightParenOrDash => Return (ExpectingCharOrChar, ')', '-'),
-				ExpressionErrorKind.ItemsDisallowed => Return (ItemsDisallowed, DescriptionFormatter.GetKindNoun (info), info.Name),
-				ExpressionErrorKind.ExpectingMethodOrTransform => Return (ExpectingFunctionOrTransform),
-				ExpressionErrorKind.ExpectingMethodName => Return (ExpectingFunctionName),
-				ExpressionErrorKind.ExpectingLeftParen => Return (ExpectingChar, '('),
-				ExpressionErrorKind.ExpectingRightParenOrComma => Return (ExpectingCharOrChar, ')', ','),
-				ExpressionErrorKind.ExpectingRightParenOrValue => Return (ExpectingRightParenOrValue),
-				ExpressionErrorKind.ExpectingValue => Return (ExpectingValue),
-				ExpressionErrorKind.CouldNotParseNumber => Return (CouldNotParseNumber),
-				ExpressionErrorKind.IncompleteValue => Return (IncompleteValue),
-				ExpressionErrorKind.ExpectingBracketColonColon => Return (ExpectingChar, "]::"),
-				ExpressionErrorKind.ExpectingClassName => Return (ExpectingClassName),
-				ExpressionErrorKind.ExpectingClassNameComponent => Return (IncompleteClassName),
-				ExpressionErrorKind.IncompleteString => Return (IncompleteString),
-				ExpressionErrorKind.IncompleteProperty => Return (IncompleteProperty),
-				_ => throw new System.Exception ($"Unhandled ExpressionErrorKind '{error.Kind}'")
-			};
-		}
-
-		public const string MetadataDisallowed_Id = nameof(MetadataDisallowed);
-		public static readonly MSBuildDiagnosticDescriptor MetadataDisallowed = new (
-			MetadataDisallowed_Id,
-			"Metadata not permitted",
-			"{0} `{1}` does not permit metadata",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string ItemsDisallowed_Id = nameof(ItemsDisallowed);
-		public static readonly MSBuildDiagnosticDescriptor ItemsDisallowed = new (
-			ItemsDisallowed_Id,
-			"Items not permitted",
-			"{0} `{1}` does not permit items",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string EmptyListValue_Id = nameof(EmptyListValue);
-		public static readonly MSBuildDiagnosticDescriptor EmptyListValue = new (
-			EmptyListValue_Id,
-			"Empty list value",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string ExpectingItemName_Id = nameof(ExpectingItemName);
-		public static readonly MSBuildDiagnosticDescriptor ExpectingItemName = new (
-			ExpectingItemName_Id,
-			"Expecting item name",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string ExpectingChar_Id = nameof(ExpectingChar);
-		public static readonly MSBuildDiagnosticDescriptor ExpectingChar = new (
-			ExpectingChar_Id,
-			"Expecting `{0}`",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string ExpectingCharOrChar_Id = nameof(ExpectingCharOrChar);
-		public static readonly MSBuildDiagnosticDescriptor ExpectingCharOrChar = new (
-			ExpectingCharOrChar_Id,
-			"Expecting `{0}` or `{1}`",
-			MSBuildDiagnosticSeverity.Error);
-
-		public static readonly MSBuildDiagnosticDescriptor ExpectingPropertyName= new (
-			nameof (ExpectingPropertyName),
-			"Expecting property name",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string ExpectingMetadataName_Id = nameof(ExpectingMetadataName);
-		public static readonly MSBuildDiagnosticDescriptor ExpectingMetadataName = new (
-			ExpectingMetadataName_Id,
-			"Expecting metadata name",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string ExpectingMetadataOrItemName_Id = nameof(ExpectingMetadataOrItemName);
-		public static readonly MSBuildDiagnosticDescriptor ExpectingMetadataOrItemName = new (
-			ExpectingMetadataOrItemName_Id,
-			"Expecting metadata or item name",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string ExpectingFunctionName_Id = nameof(ExpectingFunctionName);
-		public static readonly MSBuildDiagnosticDescriptor ExpectingFunctionName = new (
-			ExpectingFunctionName_Id,
-			"Expecting function name",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string ExpectingValue_Id = nameof(ExpectingValue);
-		public static readonly MSBuildDiagnosticDescriptor ExpectingValue = new (
-			ExpectingValue_Id,
-			"Expecting value",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string ExpectingFunctionOrTransform_Id = nameof(ExpectingFunctionOrTransform);
-		public static readonly MSBuildDiagnosticDescriptor ExpectingFunctionOrTransform = new (
-			ExpectingFunctionOrTransform_Id,
-			"Expecting item function or transform",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string ExpectingClassName_Id = nameof(ExpectingClassName);
-		public static readonly MSBuildDiagnosticDescriptor ExpectingClassName = new (
-			ExpectingClassName_Id,
-			"Expecting class name",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string IncompleteClassName_Id = nameof(IncompleteClassName);
-		public static readonly MSBuildDiagnosticDescriptor IncompleteClassName = new (
-			IncompleteClassName_Id,
-			"Incomplete class name",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string IncompleteString_Id = nameof(IncompleteString);
-		public static readonly MSBuildDiagnosticDescriptor IncompleteString = new (
-			IncompleteString_Id,
-			"Incomplete string",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string IncompleteValue_Id = nameof(IncompleteValue);
-		public static readonly MSBuildDiagnosticDescriptor IncompleteValue = new (
-			IncompleteValue_Id,
-			"Incomplete value",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string IncompleteProperty_Id = nameof(IncompleteProperty);
-		public static readonly MSBuildDiagnosticDescriptor IncompleteProperty = new (
-			IncompleteProperty_Id,
-			"Incomplete property",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string CouldNotParseNumber_Id = nameof(CouldNotParseNumber);
-		public static readonly MSBuildDiagnosticDescriptor CouldNotParseNumber = new (
-			CouldNotParseNumber_Id,
-			"Invalid number format",
-			MSBuildDiagnosticSeverity.Error);
-
-		public const string ExpectingRightParenOrValue_Id = nameof(ExpectingRightParenOrValue);
-		public static readonly MSBuildDiagnosticDescriptor ExpectingRightParenOrValue = new (
-			ExpectingRightParenOrValue_Id,
-			"Expecting `)` or value",
 			MSBuildDiagnosticSeverity.Error);
 
 		public const string UnwrittenItem_Id = nameof(UnwrittenItem);
