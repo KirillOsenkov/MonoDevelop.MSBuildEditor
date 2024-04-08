@@ -13,6 +13,8 @@ enum BuiltInSchemaId
 	Cpp,
 	CSharp,
 	CSharpWarningCodes,
+	AnalyzerWarningCodes,
+	StyleRuleCodes,
 	ILLink,
 	NetSdk,
 	NuGet,

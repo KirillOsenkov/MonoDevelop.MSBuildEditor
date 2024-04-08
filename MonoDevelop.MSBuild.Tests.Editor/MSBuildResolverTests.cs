@@ -34,7 +34,6 @@ using MonoDevelop.MSBuild.Editor.Roslyn;
 using MonoDevelop.MSBuild.Language;
 using MonoDevelop.MSBuild.Language.Syntax;
 using MonoDevelop.MSBuild.Language.Typesystem;
-
 using MonoDevelop.Xml.Tests;
 
 using NUnit.Framework;
@@ -42,13 +41,12 @@ using NUnit.Framework;
 namespace MonoDevelop.MSBuild.Tests
 {
 	[TestFixture]
-	public class MSBuildResolverTests
+	class MSBuildResolverTests : MSBuildDocumentTest
 	{
 		List<(int offset, MSBuildResolveResult result)> Resolve (string doc, ILogger logger)
 		{
 			var functionTypeProvider = new RoslynFunctionTypeProvider (null, logger);
-			return MSBuildTestHelpers
-				.SelectAtMarkers (doc, (state) => MSBuildResolver.Resolve (state.parser.Clone (), state.textSource, state.doc, functionTypeProvider, logger))
+			return SelectAtMarkers (doc, (state) => MSBuildResolver.Resolve (state.parser.Clone (), state.textSource, state.doc, functionTypeProvider, logger))
 				.ToList ();
 		}
 
@@ -211,6 +209,33 @@ namespace MonoDevelop.MSBuild.Tests
 				(MSBuildReferenceKind.Keyword, "Project"),
 				(MSBuildReferenceKind.Keyword, "include"),
 				(MSBuildReferenceKind.Keyword, "DependsOnTargets")
+			);
+		}
+
+		[Test]
+		public void ClosingTagResolution ()
+		{
+			var doc = @"
+<project>
+  <propertygroup>
+    <foo condition=""'x$(ooo)'==''"">bar$(x)</f|oo>
+  </propertygroup>
+  <target name='Foo'>
+    <itemgroup>
+      <noooo include=""@(bar->'%(baz.foo)$(foo)')"">
+        <somemeta>1234</someme|ta>
+      </noo|oo>
+    </itemgr|oup>
+  </targ|et>
+</project>".TrimStart ();
+
+			AssertReferences (
+				doc,
+				(MSBuildReferenceKind.Property, "foo"),
+				(MSBuildReferenceKind.Metadata, ("noooo", "somemeta")),
+				(MSBuildReferenceKind.Item, "noooo"),
+				(MSBuildReferenceKind.Keyword, "ItemGroup"),
+				(MSBuildReferenceKind.Keyword, "Target")
 			);
 		}
 

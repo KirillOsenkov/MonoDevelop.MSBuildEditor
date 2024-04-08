@@ -123,46 +123,60 @@ namespace MonoDevelop.MSBuild.Language
 			}
 
 			bool IsIn (int start, int length) => offset >= start && offset <= (start + length);
+			bool IsIn (TextSpan span) => span.ContainsOuter (offset);
 
 			protected override void VisitResolvedElement (XElement element, MSBuildElementSyntax elementSymbol, ITypedSymbol valueSymbol)
 			{
 				var start = element.NameOffset;
-				if (element.Name.IsValid && IsIn (start, element.Name.Name.Length)) {
-					rr.ReferenceOffset = start;
-					rr.Reference = element.Name.Name;
-					rr.ReferenceLength = element.Name.Name.Length;
-					switch (elementSymbol.SyntaxKind) {
-					case MSBuildSyntaxKind.Item:
-					case MSBuildSyntaxKind.ItemDefinition:
-						rr.ReferenceKind = MSBuildReferenceKind.Item;
-						return;
-					case MSBuildSyntaxKind.Metadata:
-						rr.ReferenceKind = MSBuildReferenceKind.Metadata;
-						rr.Reference = (element.ParentElement!.Name.Name, element.Name.Name);
-						return;
-					case MSBuildSyntaxKind.Task:
-						rr.ReferenceKind = MSBuildReferenceKind.Task;
-						return;
-					case MSBuildSyntaxKind.Parameter:
-						var taskName = element.ParentElement!.ParentElement!.Attributes.Get ("TaskName", true)?.Value;
-						if (!string.IsNullOrEmpty (taskName)) {
-							taskName = taskName.Substring (taskName.LastIndexOf ('.') + 1);
-							rr.ReferenceKind = MSBuildReferenceKind.TaskParameter;
-							rr.Reference = (taskName, element.Name.Name);
-						}
-						return;
-					case MSBuildSyntaxKind.Property:
-						rr.ReferenceKind = MSBuildReferenceKind.Property;
-						return;
-					default:
-						if (!elementSymbol.IsAbstract) {
-							rr.ReferenceKind = MSBuildReferenceKind.Keyword;
-							rr.Reference = elementSymbol;
-						}
+
+				if (!element.Name.IsValid) {
+					base.VisitResolvedElement (element, elementSymbol, valueSymbol);
+					return;
+				}
+
+				if (!IsIn (element.NameSpan)) {
+					if (element.ClosingTag is XClosingTag ct && IsIn (ct.NameSpan)) {
+						start = ct.NameSpan.Start;
+					} else {
+						base.VisitResolvedElement (element, elementSymbol, valueSymbol);
 						return;
 					}
 				}
-				base.VisitResolvedElement (element, elementSymbol, valueSymbol);
+
+				string elementName = element.Name.Name;
+				rr.ReferenceOffset = start;
+				rr.Reference = elementName;
+				rr.ReferenceLength = elementName.Length;
+				switch (elementSymbol.SyntaxKind) {
+				case MSBuildSyntaxKind.Item:
+				case MSBuildSyntaxKind.ItemDefinition:
+					rr.ReferenceKind = MSBuildReferenceKind.Item;
+					return;
+				case MSBuildSyntaxKind.Metadata:
+					rr.ReferenceKind = MSBuildReferenceKind.Metadata;
+					rr.Reference = (element.ParentElement!.Name.Name, elementName);
+					return;
+				case MSBuildSyntaxKind.Task:
+					rr.ReferenceKind = MSBuildReferenceKind.Task;
+					return;
+				case MSBuildSyntaxKind.Parameter:
+					var taskName = element.ParentElement!.ParentElement!.Attributes.Get ("TaskName", true)?.Value;
+					if (!string.IsNullOrEmpty (taskName)) {
+						taskName = taskName.Substring (taskName.LastIndexOf ('.') + 1);
+						rr.ReferenceKind = MSBuildReferenceKind.TaskParameter;
+						rr.Reference = (taskName, elementName);
+					}
+					return;
+				case MSBuildSyntaxKind.Property:
+					rr.ReferenceKind = MSBuildReferenceKind.Property;
+					return;
+				default:
+					if (!elementSymbol.IsAbstract) {
+						rr.ReferenceKind = MSBuildReferenceKind.Keyword;
+						rr.Reference = elementSymbol;
+					}
+					return;
+				}
 			}
 
 			protected override void VisitResolvedAttribute (
@@ -356,20 +370,20 @@ namespace MonoDevelop.MSBuild.Language
 					}
 					return;
 				case MSBuildValueKind.Lcid:
-					if (CultureHelper.TryGetLcidSymbol (value, out ISymbol? lcidSymbol)) {
+					if (CultureHelper.TryGetLcidSymbol (value, out ITypedSymbol? lcidSymbol)) {
 						rr.ReferenceKind = MSBuildReferenceKind.KnownValue;
 						rr.Reference = lcidSymbol;
 					}
 					break;
 				case MSBuildValueKind.Culture:
-					if (CultureHelper.TryGetCultureSymbol (value, out ISymbol? cultureSymbol)) {
+					if (CultureHelper.TryGetCultureSymbol (value, out ITypedSymbol? cultureSymbol)) {
 						rr.ReferenceKind = MSBuildReferenceKind.KnownValue;
 						rr.Reference = cultureSymbol;
 					}
 					return;
 				}
 
-				if (Document.GetSchemas (true).TryGetKnownValue (valueSymbol, value, out ISymbol? knownValue, out _)) {
+				if (Document.GetSchemas (true).TryGetKnownValue (valueSymbol, value, out ITypedSymbol? knownValue, out _)) {
 					rr.ReferenceKind = MSBuildReferenceKind.KnownValue;
 					rr.Reference = knownValue;
 					return;

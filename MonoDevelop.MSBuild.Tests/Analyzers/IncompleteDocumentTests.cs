@@ -2,13 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using MonoDevelop.MSBuild.Language;
-
 using NUnit.Framework;
 
 namespace MonoDevelop.MSBuild.Tests.Analyzers
 {
 	[TestFixture]
-	class IncompleteDocumentTests : MSBuildAnalyzerTest
+	class IncompleteDocumentTests : MSBuildDocumentTest
 	{
 		[Test]
 		[TestCase ("")]
@@ -21,7 +20,7 @@ namespace MonoDevelop.MSBuild.Tests.Analyzers
 				source,
 				out var parsedDocument,
 				includeCoreDiagnostics: true,
-				checkUnexpectedDiagnostics: false
+				ignoreUnexpectedDiagnostics: true
 			);
 
 			// reparse to catch any issues in reuse of previous doc
@@ -29,7 +28,7 @@ namespace MonoDevelop.MSBuild.Tests.Analyzers
 				source,
 				out _,
 				includeCoreDiagnostics: true,
-				checkUnexpectedDiagnostics: false,
+				ignoreUnexpectedDiagnostics: true,
 				previousDocument : parsedDocument
 			);
 		}
@@ -53,7 +52,7 @@ namespace MonoDevelop.MSBuild.Tests.Analyzers
 					source,
 					out var parsedDocument,
 					includeCoreDiagnostics: true,
-					checkUnexpectedDiagnostics: false,
+					ignoreUnexpectedDiagnostics: true,
 					previousDocument: previousParsedDocument
 				);
 				previousParsedDocument = parsedDocument;

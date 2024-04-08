@@ -294,6 +294,11 @@
                   "helpUrl": {
                     "type": "string",
                     "description": "Documentation link to be displayed in UI."
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Aliases for this value. They will not be shown in completion, but validation and Find References will consider them to be equivalent."
                   }
                 },
                 "additionalProperties": false
@@ -316,6 +321,22 @@
         "caseSensitive": {
           "description": "Whether values should be compared in a case-sensitive way",
           "type": "boolean"
+        },
+        "analyzerHints": {
+          "type": "object",
+          "properties": {
+            "GuidFormat": {
+              "type": "string",
+              "enum": [
+                "N",
+                "D",
+                "B",
+                "P"
+              ],
+              "description": "Constrains a `guid`-derived type to a specific `Guid.TryParseExact` format"
+            }
+          },
+          "additionalProperties": true
         }
       },
       "additionalProperties": false
