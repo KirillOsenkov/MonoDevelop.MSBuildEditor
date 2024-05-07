@@ -9,6 +9,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
+using MonoDevelop.MSBuild.Language;
 using MonoDevelop.MSBuild.Language.Typesystem;
 using MonoDevelop.Xml.Analysis;
 
@@ -84,10 +85,15 @@ partial class MSBuildSchema
 						AddError (defPropVal ?? propertyDefObj, $"Property '{propertyName}' definition property '{defPropName}' has no value");
 						continue;
 					}
-					bool GetValueString ([NotNullWhen (true)] out string? value)
+					bool GetValueString ([NotNullWhen (true)] out string? value, bool allowEmpty = false)
 					{
 						if (defPropVal is JValue v && (value = v.Value as string) is not null) {
-							return true;
+							if (value.Length != 0 || allowEmpty) {
+								return true;
+							}
+							AddWarning (defPropVal ?? propertyDefObj, $"Property '{propertyName}' definition property '{defPropName}' has empty value");
+							value = null;
+							return false;
 						}
 						AddError (defPropVal ?? propertyDefObj, $"Property '{propertyName}' definition property '{defPropName}' must be a string");
 						value = null;
@@ -96,10 +102,10 @@ partial class MSBuildSchema
 
 					switch (defPropName) {
 					case "description":
-						GetValueString (out description);
+						GetValueString (out description, allowEmpty: true);
 						break;
 					case "defaultValue":
-						GetValueString (out defaultValue);
+						GetValueString (out defaultValue, allowEmpty: true);
 						break;
 					case "deprecationMessage":
 						GetValueString (out deprecationMessage);
@@ -118,7 +124,7 @@ partial class MSBuildSchema
 
 				(MSBuildValueKind kind, CustomTypeInfo customType) = typeLoader.TryMaterialize ();
 
-				yield return new PropertyInfo (propertyName, description, kind, customType, defaultValue, deprecationMessage, helpUrl);
+				yield return new PropertyInfo (propertyName, description, kind, customType, defaultValue, TryCreateSymbolVersionInfo (deprecationMessage), helpUrl);
 			}
 		}
 
@@ -151,10 +157,15 @@ partial class MSBuildSchema
 						continue;
 					}
 
-					bool GetValueString ([NotNullWhen (true)] out string? value)
+					bool GetValueString ([NotNullWhen (true)] out string? value, bool allowEmpty = false)
 					{
 						if (defPropVal is JValue v && (value = v.Value as string) is not null) {
-							return true;
+							if (value.Length != 0 || allowEmpty) {
+								return true;
+							}
+							AddWarning (defPropVal ?? itemDefObj, $"Target '{itemName}' definition property '{defPropName}' has empty value");
+							value = null;
+							return false;
 						}
 						AddError (defPropVal ?? itemDefObj, $"Item '{itemName}' definition property '{defPropName}' must be a string");
 						value = null;
@@ -163,7 +174,7 @@ partial class MSBuildSchema
 
 					switch (defPropName) {
 					case "description":
-						GetValueString (out description);
+						GetValueString (out description, allowEmpty: true);
 						break;
 					case "includeDescription":
 						GetValueString (out includeDescription);
@@ -191,7 +202,7 @@ partial class MSBuildSchema
 				// NOTE: even when the kind is not custom, the customType object might be a NuGet package type, which is valid
 				(MSBuildValueKind kind, CustomTypeInfo? customType) = typeLoader.TryMaterialize ();
 
-				var item = new ItemInfo (itemName, description, includeDescription, kind, customType, null, deprecationMessage, helpUrl);
+				var item = new ItemInfo (itemName, description, includeDescription, kind, customType, null, TryCreateSymbolVersionInfo (deprecationMessage), helpUrl);
 
 				if (metadata != null) {
 					AddItemMetadata (item, metadata);
@@ -199,6 +210,14 @@ partial class MSBuildSchema
 
 				yield return item;
 			}
+		}
+
+		static SymbolVersionInfo? TryCreateSymbolVersionInfo (string? deprecationMessage)
+		{
+			if (deprecationMessage is not null) {
+				return new SymbolVersionInfo (DeprecationMessage: deprecationMessage);
+			}
+			return null;
 		}
 
 		void AddItemMetadata (ItemInfo item, JObject metadataCollection)
@@ -240,10 +259,15 @@ partial class MSBuildSchema
 					continue;
 				}
 
-				bool GetValueString ([NotNullWhen (true)] out string? value)
+				bool GetValueString ([NotNullWhen (true)] out string? value, bool allowEmpty = false)
 				{
 					if (defPropVal is JValue v && (value = v.Value as string) is not null) {
-						return true;
+						if (value.Length != 0 || allowEmpty) {
+							return true;
+						}
+						AddWarning (defPropVal ?? metadataDefObj, $"Item metadata '{FormatName()}' definition property '{defPropName}' has empty value");
+						value = null;
+						return false;
 					}
 					AddError (defPropVal ?? metadataDefObj, $"Item metadata '{FormatName()}' definition property '{defPropName}' must be a string");
 					value = null;
@@ -262,10 +286,10 @@ partial class MSBuildSchema
 
 				switch (defPropName) {
 				case "description":
-					GetValueString (out description);
+					GetValueString (out description, allowEmpty: true);
 					break;
 				case "defaultValue":
-					GetValueString (out defaultValue);
+					GetValueString (out defaultValue, allowEmpty: true);
 					break;
 				case "isRequired":
 					GetValueBool (out required);
@@ -289,7 +313,7 @@ partial class MSBuildSchema
 
 			return new MetadataInfo (
 				metadataName, description, false, required ?? false, kind, null,
-				customType, defaultValue, deprecationMessage, helpUrl
+				customType, defaultValue, TryCreateSymbolVersionInfo (deprecationMessage), helpUrl
 			);
 		}
 
@@ -387,10 +411,15 @@ partial class MSBuildSchema
 
 				foreach ((string defPropName, JToken? defPropVal) in targetDefObj) {
 
-					bool GetValueString ([NotNullWhen (true)] out string? value)
+					bool GetValueString ([NotNullWhen (true)] out string? value, bool allowEmpty = false)
 					{
 						if (defPropVal is JValue v && (value = v.Value as string) is not null) {
-							return true;
+							if (value.Length != 0 || allowEmpty) {
+								return true;
+							}
+							AddWarning (defPropVal ?? targetDefObj, $"Target '{targetName}' definition property '{defPropName}' has empty value");
+							value = null;
+							return false;
 						}
 						AddError (defPropVal ?? targetDefObj, $"Target '{targetName}' definition property '{defPropName}' must be a string");
 						value = null;
@@ -399,7 +428,7 @@ partial class MSBuildSchema
 
 					switch (defPropName) {
 					case "description":
-						GetValueString (out description);
+						GetValueString (out description, allowEmpty: true);
 						break;
 					case "deprecationMessage":
 						GetValueString (out deprecationMessage);
@@ -413,7 +442,7 @@ partial class MSBuildSchema
 					}
 				}
 
-				yield return new TargetInfo (targetName, description, deprecationMessage, helpUrl);
+				yield return new TargetInfo (targetName, description, TryCreateSymbolVersionInfo (deprecationMessage), helpUrl);
 			}
 		}
 
@@ -428,7 +457,7 @@ partial class MSBuildSchema
 			}
 
 			if (token is JArray conciseDef) {
-				return (MSBuildValueKind.CustomType, ReadConciseCustomTypeDefinition (conciseDef));
+				return (MSBuildValueKind.CustomType, ReadConciseCustomTypeDefinition (conciseDef, null));
 			}
 
 			if (token is not JObject typeDefObj) {
@@ -436,7 +465,7 @@ partial class MSBuildSchema
 				return (MSBuildValueKind.Unknown, null);
 			}
 
-			(var definition, var reference) = ReadCustomTypeDefinitionOrReference (typeDefObj);
+			(var definition, var reference) = ReadCustomTypeDefinitionOrReference (typeDefObj, null);
 
 			if (reference != null) {
 				if (CustomTypes is not null && CustomTypes.TryGetValue (reference, out var resolved)) {
@@ -456,7 +485,7 @@ partial class MSBuildSchema
 		CustomTypeInfo? ReadCustomTypeDefinition (JObject customTypeContainer, string? customTypeId, JToken? customTypeDef)
 		{
 			if (customTypeDef is JArray conciseDef) {
-				return ReadConciseCustomTypeDefinition (conciseDef);
+				return ReadConciseCustomTypeDefinition (conciseDef, customTypeId);
 			}
 			if (customTypeDef is not JObject customTypeDefObj) {
 				AddError (customTypeDef ?? customTypeContainer, customTypeId is not null
@@ -465,7 +494,7 @@ partial class MSBuildSchema
 				return null;
 			}
 
-			(var definition, var reference) = ReadCustomTypeDefinitionOrReference (customTypeDefObj);
+			(var definition, var reference) = ReadCustomTypeDefinitionOrReference (customTypeDefObj, customTypeId);
 			if (reference != null) {
 				AddWarning (customTypeDefObj, customTypeId is not null
 					? $"Custom type definition '{customTypeId}' cannot be a type reference"
@@ -476,7 +505,9 @@ partial class MSBuildSchema
 			return definition;
 		}
 
-		CustomTypeInfo ReadConciseCustomTypeDefinition (JArray conciseCustomTypeDef)
+		static string? MakeAnonymousTypeName (string? customTypeId) => customTypeId is null? null : $"#{customTypeId}";
+
+		CustomTypeInfo ReadConciseCustomTypeDefinition (JArray conciseCustomTypeDef, string? customTypeId)
 		{
 			var values = new List<CustomTypeValue> (conciseCustomTypeDef.Count);
 			foreach (var defVal in conciseCustomTypeDef) {
@@ -486,10 +517,10 @@ partial class MSBuildSchema
 				}
 				values.Add (new CustomTypeValue (customTypeValue, null));
 			}
-			return new (values);
+			return new (values, MakeAnonymousTypeName (customTypeId));
 		}
 
-		(CustomTypeInfo? definition, string? reference) ReadCustomTypeDefinitionOrReference (JObject customTypeObj)
+		(CustomTypeInfo? definition, string? reference) ReadCustomTypeDefinitionOrReference (JObject customTypeObj, string? customTypeId)
 		{
 			var enumerator = customTypeObj.GetEnumerator ();
 			if (!enumerator.MoveNext ()) {
@@ -504,6 +535,7 @@ partial class MSBuildSchema
 			bool? allowUnknownValues = null;
 			MSBuildValueKind? baseValueKind = null;
 			bool? caseSensitive = null;
+			string? helpUrl = null;
 
 			bool foundAnyNonRef = false;
 
@@ -512,10 +544,15 @@ partial class MSBuildSchema
 			do {
 				(string defPropName, JToken? defPropVal) = enumerator.Current;
 
-				bool GetValueString ([NotNullWhen (true)] out string? value)
+				bool GetValueString ([NotNullWhen (true)] out string? value, bool allowEmpty = false)
 				{
 					if (defPropVal is JValue v && (value = v.Value as string) is not null) {
-						return true;
+						if (value.Length != 0 || allowEmpty) {
+							return true;
+						}
+						AddWarning (defPropVal ?? customTypeObj, $"Custom type definition property '{defPropName}' definition property has empty value");
+						value = null;
+						return false;
 					}
 					AddError (defPropVal ?? customTypeObj, $"Custom type definition property '{defPropName}' must be a string");
 					value = null;
@@ -551,7 +588,7 @@ partial class MSBuildSchema
 					}
 					break;
 				case "description":
-					GetValueString (out description);
+					GetValueString (out description, allowEmpty: true);
 					break;
 				case "allowUnknownValues":
 					GetValueBool(out allowUnknownValues);
@@ -594,6 +631,9 @@ partial class MSBuildSchema
 					}
 					break;
 				}
+				case "helpUrl":
+					GetValueString (out helpUrl);
+					break;
 				default:
 					AddWarning (defPropVal ?? customTypeObj, $"Custom type definition has unknown property '{defPropName}'");
 					break;
@@ -605,7 +645,7 @@ partial class MSBuildSchema
 				allowUnknownValues = true;
 			}
 
-			return (new CustomTypeInfo (values, name, description, allowUnknownValues ?? false, baseValueKind ?? MSBuildValueKind.Unknown, caseSensitive ?? false, analyzerHints), null);
+			return (new CustomTypeInfo (values, name ?? MakeAnonymousTypeName (customTypeId), description, allowUnknownValues ?? false, baseValueKind ?? MSBuildValueKind.Unknown, caseSensitive ?? false, analyzerHints, helpUrl), null);
 		}
 
 		CustomTypeValue ReadCustomTypeValue (JObject customTypeValueCollection, string customTypeValueName, JToken? customTypeValueToken)
@@ -624,10 +664,15 @@ partial class MSBuildSchema
 
 			foreach ((string defPropName, JToken? defPropVal) in customTypeValueObj) {
 
-				bool GetValueString ([NotNullWhen (true)] out string? value)
+				bool GetValueString ([NotNullWhen (true)] out string? value, bool allowEmpty = false)
 				{
 					if (defPropVal is JValue v && (value = v.Value as string) is not null) {
-						return true;
+						if (value.Length != 0 || allowEmpty) {
+							return true;
+						}
+						AddWarning (defPropVal ?? customTypeValueObj, $"Custom type value '{customTypeValueName}' definition property '{defPropName}' has empty value");
+						value = null;
+						return false;
 					}
 					AddError (defPropVal ?? customTypeValueObj, $"Custom type value '{customTypeValueName}' definition property '{defPropName}' must be a string");
 					value = null;
@@ -656,7 +701,7 @@ partial class MSBuildSchema
 
 				switch (defPropName) {
 				case "description":
-					GetValueString (out description);
+					GetValueString (out description, allowEmpty: true);
 					break;
 				case "deprecationMessage":
 					GetValueString (out deprecationMessage);
@@ -673,7 +718,7 @@ partial class MSBuildSchema
 				}
 			}
 
-			return new CustomTypeValue (customTypeValueName, description, deprecationMessage, helpUrl, aliases);
+			return new CustomTypeValue (customTypeValueName, description, TryCreateSymbolVersionInfo (deprecationMessage), helpUrl, aliases);
 		}
 
 		static readonly MSBuildValueKind[] PermittedBaseKinds = new[] {

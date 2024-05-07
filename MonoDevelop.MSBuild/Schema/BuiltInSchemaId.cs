@@ -16,6 +16,7 @@ enum BuiltInSchemaId
 	AnalyzerWarningCodes,
 	StyleRuleCodes,
 	ILLink,
+	JavaScript,
 	NetSdk,
 	NuGet,
 	NuGetPack,
@@ -27,5 +28,10 @@ enum BuiltInSchemaId
 	ProjectSystemMps,
 	ProjectSystemCps,
 	GenerateAssemblyInfo,
-	ValidatePackage
+	ValidatePackage,
+	ILCompiler,
+	AspireAppHost,
+	AspireHostingOrchestration,
+	AspireHostingSdk,
+	AspireDashboardSdk
 }

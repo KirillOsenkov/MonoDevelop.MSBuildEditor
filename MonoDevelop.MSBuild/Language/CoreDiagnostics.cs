@@ -369,14 +369,14 @@ namespace MonoDevelop.MSBuild.Language
 		public static readonly MSBuildDiagnosticDescriptor ImportVersionRequiresSdk = new (
 			ImportVersionRequiresSdk_Id,
 			"Import Version requires Sdk",
-			"Import may only have a Version attribute if it has an Sdk attribute",
+			"Import may only have a `Version` attribute if it has an `Sdk` attribute",
 			MSBuildDiagnosticSeverity.Error);
 
-		public const string ImportMinVersionRequiresSdk_Id = nameof(ImportMinVersionRequiresSdk);
-		public static readonly MSBuildDiagnosticDescriptor ImportMinVersionRequiresSdk = new (
-			ImportMinVersionRequiresSdk_Id,
-			"Import MinVersion requires Sdk",
-			"Import may only have a MinVersion attribute if it has an Sdk attribute",
+		public const string ImportMinimumVersionRequiresSdk_Id = nameof(ImportMinimumVersionRequiresSdk);
+		public static readonly MSBuildDiagnosticDescriptor ImportMinimumVersionRequiresSdk = new (
+			ImportMinimumVersionRequiresSdk_Id,
+			"Import `MinimumVersion` requires Sdk",
+			"Import may only have a `MinimumVersion` attribute if it has an `Sdk` attribute",
 			MSBuildDiagnosticSeverity.Warning);
 
 		public const string UnknownValue_Id = nameof(UnknownValue);
@@ -470,6 +470,13 @@ namespace MonoDevelop.MSBuild.Language
 			"The value `{0}` is not a valid suffixed version format",
 			MSBuildDiagnosticSeverity.Error);
 
+		public const string InvalidNuGetVersionExpression_Id = nameof (InvalidNuGetVersionExpression);
+		public static readonly MSBuildDiagnosticDescriptor InvalidNuGetVersionExpression = new (
+			InvalidNuGetVersionExpression_Id,
+			"Invalid NuGet version expression",
+			"The value `{0}` is not a valid NuGet version or version expression.",
+			MSBuildDiagnosticSeverity.Error);
+
 		public const string InvalidClrNamespace_Id = nameof (InvalidClrNamespace);
 		public static readonly MSBuildDiagnosticDescriptor InvalidClrNamespace = new (
 			InvalidClrNamespace_Id,
@@ -538,6 +545,13 @@ namespace MonoDevelop.MSBuild.Language
 			TargetFrameworkHasUnknownTargetPlatform_Id,
 			"Unknown target platform",
 			"The target framework `{0}` has an unknown target platform `{1}`",
+			MSBuildDiagnosticSeverity.Warning);
+
+		public const string TargetFrameworkHasUnknownProfile_Id = nameof (TargetFrameworkHasUnknownProfile);
+		public static readonly MSBuildDiagnosticDescriptor TargetFrameworkHasUnknownProfile = new (
+			TargetFrameworkHasUnknownProfile_Id,
+			"Unknown framework profile",
+			"The target framework `{0}` has unknown profile `{1}`",
 			MSBuildDiagnosticSeverity.Warning);
 
 		public const string TargetFrameworkHasUnknownTargetPlatformVersion_Id = nameof (TargetFrameworkHasUnknownTargetPlatformVersion);

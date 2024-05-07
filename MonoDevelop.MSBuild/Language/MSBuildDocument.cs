@@ -10,6 +10,7 @@ using System.Linq;
 using MonoDevelop.MSBuild.Analysis;
 using MonoDevelop.MSBuild.Dom;
 using MonoDevelop.MSBuild.Language.Expressions;
+using MonoDevelop.MSBuild.Language.Syntax;
 using MonoDevelop.MSBuild.Schema;
 using MonoDevelop.MSBuild.SdkResolution;
 using MonoDevelop.MSBuild.Workspace;
@@ -55,7 +56,7 @@ namespace MonoDevelop.MSBuild.Language
 
 		public void Build (XDocument doc, MSBuildParserContext context)
 		{
-			var project = doc.Nodes.OfType<XElement> ().FirstOrDefault (x => x.NameEquals ("Project", true));
+			var project = doc.Nodes.OfType<XElement> ().FirstOrDefault (x => x.Name.Equals (MSBuildElementName.Project, true));
 			if (project == null) {
 				//TODO: error
 				return;
@@ -168,8 +169,8 @@ namespace MonoDevelop.MSBuild.Language
 			SdkInfo sdkInfo = null;
 			string sdkString = null;
 
-			if (element.SdkAttribute is MSBuildAttribute sdkAtt && sdkAtt.Value is ExpressionText sdkTxt) {
-				var loc = sdkAtt.XAttribute.ValueSpan;
+			if (element.SdkAttribute is MSBuildAttribute sdkAtt && sdkAtt.Value is ExpressionText sdkTxt && sdkAtt.XAttribute.HasValue) {
+				var loc = sdkAtt.XAttribute.ValueSpan.Value;
 
 				sdkString = sdkTxt.Value;
 
@@ -200,8 +201,8 @@ namespace MonoDevelop.MSBuild.Language
 				}
 			}
 
-			if (importPath != null) {
-				var loc = importAtt.XAttribute.ValueSpan;
+			if (importPath != null && importAtt.XAttribute.HasValue) {
+				var loc = importAtt.XAttribute.ValueSpan.Value;
 
 				foreach (var import in importResolver.Resolve (importPath, importTxt, sdkString, sdkInfo)) {
 					AddImport (import);
@@ -233,7 +234,7 @@ namespace MonoDevelop.MSBuild.Language
 			}
 		}
 
-		IEnumerable<(string id, TextSpan span)> SplitSdkValue (int offset, string value)
+		static IEnumerable<(string id, TextSpan span)> SplitSdkValue (int offset, string value)
 		{
 			int start = 0, end;
 			while ((end = value.IndexOf (';', start)) > -1) {
@@ -243,7 +244,7 @@ namespace MonoDevelop.MSBuild.Language
 			end = value.Length;
 			yield return MakeResult ();
 
-			TextSpan CreateSpan (int s, int e) => new TextSpan (offset + s, offset + e);
+			TextSpan CreateSpan (int s, int e) => TextSpan.FromBounds (offset + s, offset + e);
 
 			(string id, TextSpan loc) MakeResult ()
 			{
@@ -277,7 +278,7 @@ namespace MonoDevelop.MSBuild.Language
 				yield break;
 			}
 
-			int offset = IsToplevel ? sdksAtt.ValueOffset : sdksAtt.Span.Start;
+			int offset = IsToplevel && sdksAtt.HasValue ? sdksAtt.ValueOffset.Value : sdksAtt.Span.Start;
 
 			foreach (var sdk in SplitSdkValue (offset, sdksAtt.Value)) {
 				if (sdk.id == null) {

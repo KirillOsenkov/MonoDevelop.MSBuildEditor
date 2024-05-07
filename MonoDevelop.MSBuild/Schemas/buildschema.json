@@ -1,5 +1,6 @@
 {
   "$id": "https://github.com/mhutch/MonoDevelop.MSBuildEditor",
+  "$comment": "This should be draft-07, but anything newer than draft-04 (or https) causes VS to error out when using the schema to validate other JSON files",
   "$schema": "http://json-schema.org/draft-04/schema#",
   "description": "Describes the MSBuild schema format",
   "type": "object",
@@ -30,7 +31,7 @@
     "intellisenseImports": {
       "type": "array",
       "items": { "type": "string" },
-      "description": "Additional files to be imported at development time for IntelliSense"
+      "description": "Additional schemas to be imported only when directly editing the file for which this schema is a sidecar."
     },
     "types": {
       "type": "object",
@@ -71,14 +72,9 @@
               "type": "boolean",
               "default": false
             },
-            "deprecationMessage": {
-              "type": "string",
-              "description": "Indicates that the property is deprecated and explains why."
-            },
-            "helpUrl": {
-              "type": "string",
-              "description": "Documentation link to be displayed in UI."
-            }
+            "deprecationMessage": { "$ref": "#/definitions/deprecationMessage" },
+            "versionInfo": { "$ref": "#/definitions/versionInfo" },
+            "helpUrl": { "$ref": "#/definitions/helpUrl" }
           },
           "additionalProperties": false
         }
@@ -118,14 +114,9 @@
               "type": "boolean",
               "default": false
             },
-            "deprecationMessage": {
-              "type": "string",
-              "description": "Indicates that the item is deprecated and explains why."
-            },
-            "helpUrl": {
-              "type": "string",
-              "description": "Documentation link to be displayed in UI."
-            }
+            "deprecationMessage": { "$ref": "#/definitions/deprecationMessage" },
+            "versionInfo": { "$ref": "#/definitions/versionInfo" },
+            "helpUrl": { "$ref": "#/definitions/helpUrl" }
           },
           "additionalProperties": false
         }
@@ -154,14 +145,9 @@
               "description": "Whether this metadata is required on items of this type",
               "type": "boolean"
             },
-            "deprecationMessage": {
-              "type": "string",
-              "description": "Indicates that the metadata is deprecated and explains why."
-            },
-            "helpUrl": {
-              "type": "string",
-              "description": "Documentation link to be displayed in UI."
-            }
+            "deprecationMessage": { "$ref": "#/definitions/deprecationMessage" },
+            "versionInfo": { "$ref": "#/definitions/versionInfo" },
+            "helpUrl": { "$ref": "#/definitions/helpUrl" }
           },
           "additionalProperties": false
         }
@@ -180,14 +166,9 @@
               "type": "string",
               "description": "Description of the target"
             },
-            "deprecationMessage": {
-              "type": "string",
-              "description": "Indicates that the target is deprecated and explains why."
-            },
-            "helpUrl": {
-              "type": "string",
-              "description": "Documentation link to be displayed in UI."
-            }
+            "deprecationMessage": { "$ref": "#/definitions/deprecationMessage" },
+            "versionInfo": { "$ref": "#/definitions/versionInfo" },
+            "helpUrl": { "$ref": "#/definitions/helpUrl" }
           },
           "additionalProperties": false
         }
@@ -229,7 +210,7 @@
       "enum": [ ";", ",", ";," ],
       "default": ";"
     },
-    "valueType" : {
+    "valueType": {
       "description": "The type of the value",
       "oneOf": [
         { "$ref": "#/definitions/valueTypeRef" },
@@ -238,7 +219,7 @@
         { "$ref": "#/definitions/valueTypeCustom" }
       ]
     },
-    "valueTypeDefinition" : {
+    "valueTypeDefinition": {
       "oneOf": [
         { "$ref": "#/definitions/valueTypeCustomMinimal" },
         { "$ref": "#/definitions/valueTypeCustom" }
@@ -263,7 +244,7 @@
       "type": "object",
       "properties": {
         "name": {
-          "description": "Overrides the name displayed in the UI",
+          "description": "Overrides the name displayed for this type in the UI. If not provided, falls back to the name of the `baseType`, otherwise the type is displayed as an anonymous type.",
           "type": "string",
           "pattern": "^([a-z][a-z\\d-]*)$"
         },
@@ -287,14 +268,9 @@
                     "type": "string",
                     "description": "Description of the value"
                   },
-                  "deprecationMessage": {
-                    "type": "string",
-                    "description": "Indicates that the property is deprecated and explains why."
-                  },
-                  "helpUrl": {
-                    "type": "string",
-                    "description": "Documentation link to be displayed in UI."
-                  },
+                  "deprecationMessage": { "$ref": "#/definitions/deprecationMessage" },
+                  "versionInfo": { "$ref": "#/definitions/versionInfo" },
+                  "helpUrl": { "$ref": "#/definitions/helpUrl" },
                   "aliases": {
                     "type": "array",
                     "items": { "type": "string" },
@@ -321,6 +297,10 @@
         "caseSensitive": {
           "description": "Whether values should be compared in a case-sensitive way",
           "type": "boolean"
+        },
+        "helpUrl": {
+          "description": "Documentation link to be displayed in UI.",
+          "type": "string"
         },
         "analyzerHints": {
           "type": "object",
@@ -487,6 +467,58 @@
         {
           "const": "clr-type-name",
           "description": "An unqualified .NET type name"
+        },
+        {
+          "const": "warning-code",
+          "description": "A warning code from the compiler, analyzers, MSBuild, etc."
+        }
+      ]
+    },
+    "deprecationMessage": {
+      "type": "string",
+      "description": "Indicates that the symbol is deprecated and explains why.",
+      "minLength": 1
+    },
+    "versionInfo": {
+      "type": "object",
+      "properties": {
+        "kind": { "$ref": "#/definitions/versionKind" },
+        "introduced": {
+          "type": "string",
+          "description": "The version in which this symbol was introduced. Depending on the value of `versionKind`, this version may refer to MSBuild, the .NET SDK, or a NuGet package."
+        },
+        "deprecated": {
+          "type": "string",
+          "description": "The version in which this symbol was deprecated. Only valid when `deprecationMessage` is set. Depending on the value of `versionKind`, this version may refer to MSBuild, the .NET SDK, or a NuGet package."
+        },
+        "ignored": {
+          "type": "boolean",
+          "description": "If the symbol is deprecated, indicates that it is ignored and assignments may be removed safely."
+        }
+      },
+      "additionalProperties": false
+    },
+    "helpUrl": {
+      "type": "string",
+      "description": "Documentation link to be displayed in UI.",
+      "minLength": 1,
+      "format": "uri"
+    },
+    "versionKind": {
+      "description": "Explicitly specify what the `since` and `deprecated` versions refer to. A default value is inferred e.g. schemas in the .NET SDK directory default to `DotNetSdk`, and schemas in the MSBuild `bin` directory or bundled with editor default to `MSBuild`.",
+      "type": "string",
+      "anyOf": [
+        {
+          "const": "MSBuild",
+          "description": "The symbol was deprecated or introduced in a specific version of MSBuild"
+        },
+        {
+          "const": "DotNetSdk",
+          "description": "The symbol was deprecated or introduced in a specific version of the .NET SDK"
+        },
+        {
+          "const": "NuGetPackage",
+          "description": "The symbol was deprecated or introduced in a specific version of a NuGet package"
         }
       ]
     }

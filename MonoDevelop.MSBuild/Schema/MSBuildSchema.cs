@@ -12,11 +12,18 @@ using MonoDevelop.MSBuild.Language.Typesystem;
 
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Diagnostics;
 
 namespace MonoDevelop.MSBuild.Schema
 {
+	[DebuggerDisplay("MSBuildSchema({OriginShort,nq})")]
 	partial class MSBuildSchema : IMSBuildSchema, IEnumerable<ISymbol>, IEnumerable<CustomTypeInfo>
 	{
+		string origin;
+
+		[DebuggerHidden]
+		string OriginShort => Path.GetFileName(origin);
+
 		public Dictionary<string, PropertyInfo> Properties { get; } = new Dictionary<string, PropertyInfo> (StringComparer.OrdinalIgnoreCase);
 		public Dictionary<string, ItemInfo> Items { get; } = new Dictionary<string, ItemInfo> (StringComparer.OrdinalIgnoreCase);
 		public Dictionary<string, TaskInfo> Tasks { get; } = new Dictionary<string, TaskInfo> (StringComparer.OrdinalIgnoreCase);
@@ -66,6 +73,7 @@ namespace MonoDevelop.MSBuild.Schema
 		void LoadInternal (TextReader reader, out IList<MSBuildSchemaLoadError> loadErrors, string origin)
 		{
 			var state = new SchemaLoadState (origin);
+			this.origin = origin;
 
 			JObject doc;
 			using (var jr = new JsonTextReader (reader)) {
@@ -119,9 +127,10 @@ namespace MonoDevelop.MSBuild.Schema
 				// all custom types are resolvable
 				state.LoadCustomTypes (customTypes);
 
-				// only named custom types are surfaced directly on the schema
+				// only named custom types are surfaced directly on the schema,
+				// as well as anonymous types deriving from `warning-code` as those are needed for completion
 				foreach (var ct in state.CustomTypes.Values) {
-					if (!string.IsNullOrEmpty (ct.Name)) {
+					if (ct.Name is not null && (!ct.IsAnonymous || ct.BaseKind == MSBuildValueKind.WarningCode)) {
 						Types.Add (ct.Name, ct);
 					}
 				}

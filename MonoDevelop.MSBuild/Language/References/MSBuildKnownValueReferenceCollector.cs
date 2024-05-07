@@ -26,7 +26,7 @@ class MSBuildKnownValueReferenceCollector : MSBuildReferenceCollector
 	readonly CustomTypeInfo? customType;
 	readonly bool isWarningCode;
 
-	public MSBuildKnownValueReferenceCollector (MSBuildDocument document, ITextSource textSource, ILogger logger, ITypedSymbol knownValue, Action<(int Offset, int Length, ReferenceUsage Usage)> reportResult)
+	public MSBuildKnownValueReferenceCollector (MSBuildDocument document, ITextSource textSource, ILogger logger, ITypedSymbol knownValue, FindReferencesReporter reportResult)
 		: base (document, textSource, logger, knownValue.Name, reportResult)
 	{
 		kind = knownValue.ValueKind;
@@ -54,9 +54,12 @@ class MSBuildKnownValueReferenceCollector : MSBuildReferenceCollector
 
 	protected override void VisitValue (
 		XElement element, XAttribute? attribute,
-		MSBuildElementSyntax elementSymbol, MSBuildAttributeSyntax? attributeSymbol,
-		ITypedSymbol valueSymbol, string expressionText, ExpressionNode node)
+		MSBuildElementSyntax elementSyntax, MSBuildAttributeSyntax? attributeSyntax,
+		ITypedSymbol elementSymbol, ITypedSymbol? attributeSymbol,
+		string expressionText, ExpressionNode node)
 	{
+		var valueSymbol = attributeSymbol ?? elementSymbol;
+
 		if (!IsTypeMatch ()) {
 			return;
 		}

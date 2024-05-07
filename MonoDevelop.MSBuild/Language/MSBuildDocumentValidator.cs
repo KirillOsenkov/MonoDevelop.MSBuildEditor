@@ -19,6 +19,10 @@ using MonoDevelop.Xml.Dom;
 using MonoDevelop.Xml.Logging;
 using MonoDevelop.Xml.Parser;
 
+using AttributeName = MonoDevelop.MSBuild.Language.Syntax.MSBuildAttributeName;
+using ElementName = MonoDevelop.MSBuild.Language.Syntax.MSBuildElementName;
+using DiagnosticProperty = MonoDevelop.MSBuild.Language.CoreDiagnosticProperty;
+
 namespace MonoDevelop.MSBuild.Language
 {
 	partial class MSBuildDocumentValidator : MSBuildDocumentVisitor
@@ -44,26 +48,30 @@ namespace MonoDevelop.MSBuild.Language
 			base.VisitUnknownAttribute (element, attribute);
 		}
 
-		protected override void VisitResolvedElement (XElement element, MSBuildElementSyntax resolved, ITypedSymbol? symbol)
+		protected override void VisitResolvedElement (XElement element, MSBuildElementSyntax elementSyntax, ITypedSymbol elementSymbol)
 		{
 			try {
-				ValidateResolvedElement (element, resolved, symbol);
+				ValidateResolvedElement (element, elementSyntax, elementSymbol);
 
-				if (element.IsComplete && resolved.SyntaxKind != MSBuildSyntaxKind.TaskBody) {
-					base.VisitResolvedElement (element, resolved, symbol);
+				if (element.IsComplete && elementSyntax.SyntaxKind != MSBuildSyntaxKind.TaskBody) {
+					base.VisitResolvedElement (element, elementSyntax, elementSymbol);
 				}
 
 			} catch (Exception ex) when (!(ex is OperationCanceledException && CancellationToken.IsCancellationRequested)) {
 				Document.Diagnostics.Add (CoreDiagnostics.InternalError, element.NameSpan, ex.Message);
-				Logger.LogInternalException (ex, "MSBuildDocumentValidator");
+				Logger.LogInternalException (ex, nameof (MSBuildDocumentValidator));
 			}
 		}
 
-		void ValidateResolvedElement (XElement element, MSBuildElementSyntax resolved, ITypedSymbol? symbol)
+		void ValidateResolvedElement (XElement element, MSBuildElementSyntax elementSyntax, ITypedSymbol elementSymbol)
 		{
-			CheckDeprecated (resolved, element);
+			CheckDeprecated (elementSyntax, element);
 
-			foreach (var rat in resolved.Attributes) {
+			if (elementSymbol != elementSyntax && elementSymbol is IVersionableSymbol versionableSymbol) {
+				CheckDeprecated (versionableSymbol, element);
+			}
+
+			foreach (var rat in elementSyntax.Attributes) {
 				if (rat.Required && !rat.IsAbstract) {
 					var xat = element.Attributes.Get (rat.Name, true);
 					if (xat == null) {
@@ -72,15 +80,11 @@ namespace MonoDevelop.MSBuild.Language
 				}
 			}
 
-			if (symbol is not null && symbol is IDeprecatable deprecatable) {
-				CheckDeprecated (deprecatable, element);
-			}
-
 			TextSpan[] GetNameSpans (XElement el) => (el.ClosingTag is XClosingTag ct)
-				? new[] { element.NameSpan, new TextSpan (ct.Span.Start + 2, ct.Name.Length) }
-				: new[] { element.NameSpan };
+				? [element.NameSpan, new TextSpan (ct.Span.Start + 2, ct.Name.Length)]
+				: [element.NameSpan];
 
-			switch (resolved.SyntaxKind) {
+			switch (elementSyntax.SyntaxKind) {
 			case MSBuildSyntaxKind.Project:
 				if (Document.FileKind.IsProject ()) {
 					ValidateProjectHasTarget (element);
@@ -102,23 +106,23 @@ namespace MonoDevelop.MSBuild.Language
 				ValidateImportOnlyHasVersionIfHasSdk (element);
 				break;
 			case MSBuildSyntaxKind.Item:
-				ValidateItemAttributes (resolved, element);
+				ValidateItemAttributes (elementSyntax, element);
 
 				// TODO: reuse the existing resolved symbol
 				if (!IsItemUsed (element.Name.Name, ReferenceUsage.Read, out _)) {
 					Document.Diagnostics.Add (
 						CoreDiagnostics.UnreadItem,
 						element.NameSpan,
-						ImmutableDictionary<string,object>.Empty
-							.Add ("Name", element.Name.Name)
-							.Add ("Spans", GetNameSpans (element)),
+						ImmutableDictionary<string, object>.Empty
+							.Add (DiagnosticProperty.MisspelledNameOrValue, element.Name.Name)
+							.Add (DiagnosticProperty.MisspelledNameSpans, GetNameSpans (element)),
 						element.Name.Name
 					);
 				}
 				break;
 
 			case MSBuildSyntaxKind.Task:
-				ValidateTaskParameters (resolved, element);
+				ValidateTaskParameters (elementSyntax, element);
 				break;
 
 			case MSBuildSyntaxKind.Property:
@@ -128,12 +132,12 @@ namespace MonoDevelop.MSBuild.Language
 						CoreDiagnostics.UnreadProperty,
 						element.NameSpan,
 						ImmutableDictionary<string, object>.Empty
-							.Add ("Name", element.Name.Name)
-							.Add ("Spans", GetNameSpans (element)),
+							.Add (DiagnosticProperty.MisspelledNameOrValue, element.Name.Name)
+							.Add (DiagnosticProperty.MisspelledNameSpans, GetNameSpans (element)),
 						element.Name.Name
 					);
 				}
-				if (symbol is PropertyInfo property) {
+				if (elementSymbol is PropertyInfo property) {
 					CheckPropertyWrite (property, element.NameSpan);
 				}
 				break;
@@ -149,50 +153,50 @@ namespace MonoDevelop.MSBuild.Language
 						CoreDiagnostics.UnreadMetadata,
 						element.NameSpan,
 						ImmutableDictionary<string, object>.Empty
-							.Add ("ItemName", metaItem)
-							.Add ("Name", element.Name.Name)
-							.Add ("Spans", GetNameSpans (element)),
+							.Add (DiagnosticProperty.MisspelledNameOrValue, element.Name.Name)
+							.Add (DiagnosticProperty.MisspelledNameSpans, GetNameSpans (element))
+							.Add (DiagnosticProperty.MisspelledMetadataItemName, metaItem),
 						metaItem, element.Name.Name
 					);
 				}
 				break;
 			}
 
-			if (resolved.ValueKind == MSBuildValueKind.Nothing) {
+			if (elementSyntax.ValueKind == MSBuildValueKind.Nothing) {
 				foreach (var txt in element.Nodes.OfType<XText> ()) {
 					Document.Diagnostics.Add (CoreDiagnostics.UnexpectedText, txt.Span, element.Name.Name);
 				}
 			}
 		}
 
-		void CheckDeprecated (IDeprecatable info, INamedXObject namedObj) => CheckDeprecated (info, namedObj.NameSpan);
+		bool CheckDeprecated (IVersionableSymbol versionableSymbol, INamedXObject namedObj) => CheckDeprecated (versionableSymbol, namedObj.NameSpan);
 
-		void CheckDeprecated (IDeprecatable info, ExpressionNode expressionNode) => CheckDeprecated (info, expressionNode.Span);
+		bool CheckDeprecated (IVersionableSymbol versionableSymbol, ExpressionNode expressionNode) => CheckDeprecated (versionableSymbol, expressionNode.Span);
 
-		void CheckDeprecated (IDeprecatable info, TextSpan squiggleSpan)
+		bool CheckDeprecated (IVersionableSymbol versionableSymbol, TextSpan squiggleSpan)
 		{
-			if (info.IsDeprecated (out string? deprecationMessage)) {
+			if (versionableSymbol.IsDeprecated (out string? deprecationMessage)) {
 				Document.Diagnostics.Add (
 					CoreDiagnostics.DeprecatedWithMessage,
 					squiggleSpan,
-					DescriptionFormatter.GetKindNoun (info),
-					info.Name,
+					DescriptionFormatter.GetKindNoun (versionableSymbol),
+					versionableSymbol.Name,
 					deprecationMessage
 				);
+				return true;
 			}
+			return false;
 		}
 
 		void ValidateProjectHasTarget (XElement element)
 		{
-			if (element.Attributes.Get ("Sdk", true) != null) {
+			if (element.Attributes.Get (AttributeName.Sdk, true) != null) {
 				return;
 			}
 
 			foreach (var child in element.Nodes) {
 				if (child is XElement projectChild && projectChild.IsNamed && !projectChild.Name.HasPrefix) {
-					switch (projectChild.Name.Name.ToLowerInvariant ()) {
-					case "target":
-					case "import":
+					if (projectChild.Name.Equals (ElementName.Target, true) || projectChild.Name.Equals (ElementName.Import, true)) {
 						return;
 					}
 				}
@@ -204,7 +208,7 @@ namespace MonoDevelop.MSBuild.Language
 		void ValidateOnErrorOnlyFollowedByOnError (XElement element)
 		{
 			var nextSibling = element.GetNextSiblingElement ();
-			if (nextSibling != null && !nextSibling.NameEquals ("OnError", true)) {
+			if (nextSibling != null && !nextSibling.Name.Equals (ElementName.OnError, true)) {
 				Document.Diagnostics.Add (CoreDiagnostics.OnErrorMustBeLastInTarget, element.GetNextSiblingElement ().NameSpan);
 			}
 		}
@@ -220,7 +224,7 @@ namespace MonoDevelop.MSBuild.Language
 		{
 			bool foundItemOrPropertyName = false;
 			foreach (var att in element.Attributes) {
-				if (att.NameEquals ("ItemName", true) || att.NameEquals ("PropertyName", true)) {
+				if (att.Name.Equals (AttributeName.ItemName, true) || att.Name.Equals (AttributeName.PropertyName, true)) {
 					foundItemOrPropertyName = true;
 					break;
 				}
@@ -238,19 +242,14 @@ namespace MonoDevelop.MSBuild.Language
 			XAttribute taskNameAtt = null;
 
 			foreach (var att in element.Attributes) {
-				switch (att.Name.Name.ToLowerInvariant ()) {
-				case "assemblyfile":
+				if (att.Name.Equals (AttributeName.AssemblyFile, true)) {
 					asmFileAtt = att;
-					break;
-				case "assemblyname":
+				} else if (att.Name.Equals (AttributeName.AssemblyName, true)) {
 					asmNameAtt = att;
-					break;
-				case "taskfactory":
+				} else if (att.Name.Equals (AttributeName.TaskFactory, true)) {
 					taskFactoryAtt = att;
-					break;
-				case "taskname":
+				} else if (att.Name.Equals (AttributeName.TaskName, true)) {
 					taskNameAtt = att;
-					break;
 				}
 			}
 
@@ -267,7 +266,7 @@ namespace MonoDevelop.MSBuild.Language
 
 			XElement parameterGroup = null, taskBody = null;
 			foreach (var child in element.Elements) {
-				if (child.NameEquals ("ParameterGroup", true)) {
+				if (child.Name.Equals (ElementName.ParameterGroup, true)) {
 					if (parameterGroup != null) {
 						Document.Diagnostics.Add (CoreDiagnostics.OneParameterGroup, child.NameSpan);
 					}
@@ -275,7 +274,7 @@ namespace MonoDevelop.MSBuild.Language
 						Document.Diagnostics.Add (CoreDiagnostics.OneTaskBody, child.NameSpan);
 					}
 					parameterGroup = child;
-				} else if (child.NameEquals ("Task", true)) {
+				} else if (child.Name.Equals (ElementName.Task, true)) {
 					taskBody = child;
 				}
 			}
@@ -293,20 +292,18 @@ namespace MonoDevelop.MSBuild.Language
 					Document.Diagnostics.Add (CoreDiagnostics.TaskFactoryMustHaveBody, element.NameSpan);
 				}
 
-				if (taskFactoryAtt is not null && taskFactoryAtt.Value is string taskFactoryName && taskFactoryName.Length > 0) {
-					switch (taskFactoryName.ToLowerInvariant ()) {
-					case "codetaskfactory":
-						if (string.Equals (asmFileAtt?.Value, "$(RoslynCodeTaskFactory)")) {
-							goto case "roslyncodetaskfactory";
-						}
-						break;
-					case "roslyncodetaskfactory":
+				if (taskFactoryAtt is not null && taskFactoryAtt.TryGetValue (out var taskFactoryName) && taskFactoryName.Length > 0) {
+					switch (WellKnownTaskFactory.TryGet (taskFactoryName, asmFileAtt?.Value)) {
+					case WellKnownTaskFactory.RoslynCodeTaskFactory:
 						if (taskBody is not null) {
 							ValidateRoslynCodeTaskFactory (element, taskBody, parameterGroup);
 						}
 						break;
+					case null:
+						Document.Diagnostics.Add (CoreDiagnostics.UnknownTaskFactory, taskFactoryAtt.ValueSpan.Value, taskFactoryName);
+						break;
 					default:
-						Document.Diagnostics.Add (CoreDiagnostics.UnknownTaskFactory, taskFactoryAtt.ValueSpan, taskFactoryName);
+						// known but we don't have any special handling
 						break;
 					}
 				}
@@ -350,16 +347,23 @@ namespace MonoDevelop.MSBuild.Language
 
 		void ValidateImportOnlyHasVersionIfHasSdk (XElement element)
 		{
-			if (element.Attributes.Get ("Sdk", true) != null) {
-				return;
+			XAttribute? versionAtt = null, minVersionAtt = null, sdkAtt = null;
+			foreach (var att in element.Attributes) {
+				if (att.Name.Equals (AttributeName.Version, true)) {
+					versionAtt = att;
+				} else if (att.Name.Equals (AttributeName.MinimumVersion, true)) {
+					minVersionAtt = att;
+				} else if (att.Name.Equals (AttributeName.Sdk, true)) {
+					sdkAtt = att;
+				}
 			}
 
-			foreach (var att in element.Attributes) {
-				if (att.NameEquals ("Version", true)) {
-					Document.Diagnostics.Add (CoreDiagnostics.ImportVersionRequiresSdk, att.NameSpan);
+			if (sdkAtt is null) {
+				if (minVersionAtt is not null) {
+					Document.Diagnostics.Add (CoreDiagnostics.ImportMinimumVersionRequiresSdk, minVersionAtt.NameSpan);
 				}
-				if (att.NameEquals ("MinVersion", true)) {
-					Document.Diagnostics.Add (CoreDiagnostics.ImportMinVersionRequiresSdk, att.NameSpan);
+				if (versionAtt is not null) {
+					Document.Diagnostics.Add (CoreDiagnostics.ImportVersionRequiresSdk, versionAtt.NameSpan);
 				}
 			}
 		}
@@ -369,15 +373,15 @@ namespace MonoDevelop.MSBuild.Language
 			bool isInTarget = resolved.IsInTarget (element);
 			bool hasInclude = false, hasUpdate = false, hasRemove = false;
 			foreach (var att in element.Attributes) {
-				hasInclude |= att.NameEquals ("Include", true);
-				hasRemove |= att.NameEquals ("Remove", true);
-				if (att.NameEquals ("Update", true)) {
+				hasInclude |= att.Name.Equals (AttributeName.Include, true);
+				hasRemove |= att.Name.Equals (AttributeName.Remove, true);
+				if (att.Name.Equals (AttributeName.Update, true)) {
 					hasUpdate = true;
 					if (isInTarget) {
 						Document.Diagnostics.Add (CoreDiagnostics.ItemAttributeNotValidInTarget, att.NameSpan, att.Name.Name);
 					}
 				}
-				if (att.NameEquals ("KeepMetadata", true) || att.NameEquals ("RemoveMetadata", true) || att.NameEquals ("KeepDuplicates", true)) {
+				if (att.Name.Equals (AttributeName.KeepMetadata, true) || att.Name.Equals (AttributeName.RemoveMetadata, true) || att.Name.Equals (AttributeName.KeepDuplicates, true)) {
 					if (!isInTarget) {
 						Document.Diagnostics.Add (CoreDiagnostics.ItemAttributeOnlyValidInTarget, att.NameSpan, att.Name.Name);
 					}
@@ -410,7 +414,7 @@ namespace MonoDevelop.MSBuild.Language
 			}
 
 			foreach (var att in element.Attributes) {
-				if (!resolvedElement.GetAttribute (att.Name.Name).IsAbstract) {
+				if (!resolvedElement.GetAttribute (att)?.IsAbstract ?? false) {
 					continue;
 				}
 				if (!info.Parameters.TryGetValue (att.Name.Name, out TaskParameterInfo pi)) {
@@ -430,58 +434,57 @@ namespace MonoDevelop.MSBuild.Language
 			}
 
 			foreach (var child in element.Elements) {
-				if (child.NameEquals ("Output", true)) {
-					var paramNameAtt = child.Attributes.Get ("TaskParameter", true);
-					var paramName = paramNameAtt?.Value;
-					if (string.IsNullOrEmpty (paramName)) {
+				if (child.Name.Equals (ElementName.Output, true)) {
+					var paramNameAtt = child.Attributes.Get (AttributeName.TaskParameter, true);
+					if (!paramNameAtt.TryGetValue (out string paramName) || paramName.Length == 0) {
 						continue;
 					}
 					if (!info.Parameters.TryGetValue (paramName, out TaskParameterInfo pi)) {
-						Document.Diagnostics.Add (CoreDiagnostics.UnknownTaskParameter, paramNameAtt.ValueSpan, element.Name.Name, paramName);
+						Document.Diagnostics.Add (CoreDiagnostics.UnknownTaskParameter, paramNameAtt.ValueSpan.Value, element.Name.Name, paramName);
 						continue;
 					}
 					if (!pi.IsOutput) {
-						Document.Diagnostics.Add (CoreDiagnostics.NonOutputTaskParameter, paramNameAtt.ValueSpan, element.Name.Name, paramName);
+						Document.Diagnostics.Add (CoreDiagnostics.NonOutputTaskParameter, paramNameAtt.ValueSpan.Value, element.Name.Name, paramName);
 						continue;
 					}
 				}
 			}
 		}
 
-		protected override void VisitResolvedAttribute (XElement element, XAttribute attribute, MSBuildElementSyntax resolvedElement, MSBuildAttributeSyntax resolvedAttribute, ITypedSymbol? symbol)
+		protected override void VisitResolvedAttribute (
+			XElement element, XAttribute attribute,
+			MSBuildElementSyntax elementSyntax, MSBuildAttributeSyntax attributeSyntax,
+			ITypedSymbol elementSymbol, ITypedSymbol attributeSymbol)
 		{
-			CheckDeprecated (resolvedAttribute, attribute);
-
-			if (resolvedAttribute.SyntaxKind == MSBuildSyntaxKind.Item_Metadata) {
+			if (attributeSyntax.SyntaxKind == MSBuildSyntaxKind.Item_Metadata) {
 				// TODO: reuse the existing resolved symbol
 				if (!IsMetadataUsed (element.Name.Name, attribute.Name.Name, ReferenceUsage.Read, out _)) {
 					Document.Diagnostics.Add (
 						CoreDiagnostics.UnreadMetadata,
 						attribute.NameSpan,
 						ImmutableDictionary<string, object>.Empty
-							.Add ("ItemName", element.Name.Name)
-							.Add ("Name", attribute.Name.Name)
-							.Add ("Spans", new[] { attribute.NameSpan }),
+							.Add (DiagnosticProperty.MisspelledMetadataItemName, element.Name.Name)
+							.Add (DiagnosticProperty.MisspelledNameOrValue, attribute.Name.Name),
 						element.Name.Name, attribute.Name.Name
 					);
 				}
 			}
 
-			ValidateAttribute (element, attribute, resolvedElement, resolvedAttribute, symbol);
+			ValidateAttribute (element, attribute, attributeSyntax, attributeSymbol);
 
-			base.VisitResolvedAttribute (element, attribute, resolvedElement, resolvedAttribute, symbol);
+			base.VisitResolvedAttribute (element, attribute, elementSyntax, attributeSyntax, elementSymbol, attributeSymbol);
 		}
 
-		void ValidateAttribute (XElement element, XAttribute attribute, MSBuildElementSyntax resolvedElement, MSBuildAttributeSyntax resolvedAttribute, ITypedSymbol info)
+		void ValidateAttribute (XElement element, XAttribute attribute, MSBuildAttributeSyntax attributeSyntax, ITypedSymbol attributeSymbol)
 		{
-			CheckDeprecated (resolvedAttribute, attribute);
+			CheckDeprecated (attributeSyntax, attribute);
 
-			if (info is not null && info is IDeprecatable deprecatable) {
-				CheckDeprecated (deprecatable, element);
+			if (attributeSymbol != attributeSyntax && attributeSymbol is IVersionableSymbol versionableSymbol) {
+				CheckDeprecated (versionableSymbol, attribute);
 			}
 
 			if (string.IsNullOrWhiteSpace (attribute.Value)) {
-				if (resolvedAttribute.Required) {
+				if (attributeSyntax.Required) {
 					Document.Diagnostics.Add (CoreDiagnostics.RequiredAttributeEmpty, attribute.NameSpan, attribute.Name);
 				} else {
 					Document.Diagnostics.Add (CoreDiagnostics.AttributeEmpty, attribute.NameSpan, attribute.Name);
@@ -496,14 +499,17 @@ namespace MonoDevelop.MSBuild.Language
 
 		protected override void VisitValue (
 			XElement element, XAttribute attribute,
-			MSBuildElementSyntax elementSymbol, MSBuildAttributeSyntax attributeSymbol,
-			ITypedSymbol valueSymbol, string expressionText, ExpressionNode expression)
+			MSBuildElementSyntax elementSyntax, MSBuildAttributeSyntax? attributeSyntax,
+			ITypedSymbol elementSymbol, ITypedSymbol? attributeSymbol,
+			string expressionText, ExpressionNode expression)
 		{
+			ITypedSymbol valueSymbol = attributeSymbol ?? elementSymbol;
+
 			if (Document.FileKind.IsProject () && valueSymbol is IHasDefaultValue hasDefault) {
 				if (hasDefault.DefaultValue != null && string.Equals (hasDefault.DefaultValue, expressionText, StringComparison.OrdinalIgnoreCase)) {
 					Document.Diagnostics.Add (
 						CoreDiagnostics.HasDefaultValue, attribute?.Span ?? element.OuterSpan,
-						ImmutableDictionary<string,object>.Empty.Add ("Info", valueSymbol),
+						ImmutableDictionary<string, object>.Empty.Add (DiagnosticProperty.Symbol, valueSymbol),
 						DescriptionFormatter.GetTitleCaseKindNoun (valueSymbol), valueSymbol.Name, hasDefault.DefaultValue);
 				}
 			}
@@ -517,13 +523,13 @@ namespace MonoDevelop.MSBuild.Language
 					Document.Diagnostics.Add (
 					CoreDiagnostics.UnexpectedList,
 					new TextSpan (list.Nodes[0].End, list.End - list.Nodes[0].End),
-					ImmutableDictionary<string, object>.Empty.Add ("Name", valueSymbol.Name),
+					ImmutableDictionary<string, object>.Empty.Add (DiagnosticProperty.Symbol, valueSymbol),
 					DescriptionFormatter.GetKindNoun (valueSymbol),
 					valueSymbol.Name);
 				} else {
 					foreach (var listVal in list.Nodes) {
 						if (listVal is ExpressionText listValText) {
-							VisitPureLiteral (elementSymbol, attributeSymbol, valueSymbol, listValText);
+							VisitPureLiteral (elementSyntax, attributeSyntax, valueSymbol, listValText);
 						}
 					}
 				}
@@ -534,7 +540,7 @@ namespace MonoDevelop.MSBuild.Language
 					}
 				}
 			} else if (expression is ExpressionText lit) {
-				VisitPureLiteral (elementSymbol, attributeSymbol, valueSymbol, lit);
+				VisitPureLiteral (elementSyntax, attributeSyntax, valueSymbol, lit);
 			} else {
 				if (!allowExpressions) {
 					AddExpressionWarning (expression);
@@ -559,9 +565,9 @@ namespace MonoDevelop.MSBuild.Language
 								CoreDiagnostics.UnwrittenMetadata,
 								meta.Span,
 								ImmutableDictionary<string, object>.Empty
-									.Add ("ItemName", metaItem)
-									.Add ("Name", meta.MetadataName)
-									.Add ("Spans", new[] { new TextSpan (meta.MetadataNameOffset, meta.MetadataName.Length) }),
+									.Add (DiagnosticProperty.MisspelledMetadataItemName, metaItem)
+									.Add (DiagnosticProperty.MisspelledNameOrValue, meta.MetadataName)
+									.Add (DiagnosticProperty.MisspelledNameSpans, new[] { new TextSpan (meta.MetadataNameOffset, meta.MetadataName.Length) }),
 								metaItem, meta.MetadataName
 							);
 						}
@@ -573,7 +579,7 @@ namespace MonoDevelop.MSBuild.Language
 				case ExpressionPropertyName prop:
 					if (!IsPropertyUsed (prop.Name, ReferenceUsage.Write, out var resolvedProperty)) {
 						if (Document.FileKind.IsProject ()) {
-							AddFixableError (CoreDiagnostics.UnwrittenProperty, prop.Name, prop.Span, prop.Name);
+							AddMisspelledNameError (CoreDiagnostics.UnwrittenProperty, prop.Name, prop.Span, prop.Name);
 						}
 					}
 					if (resolvedProperty is not null) {
@@ -583,7 +589,7 @@ namespace MonoDevelop.MSBuild.Language
 				case ExpressionItemName item:
 					if (!IsItemUsed (item.Name, ReferenceUsage.Write, out var resolvedItem)) {
 						if (Document.FileKind.IsProject ()) {
-							AddFixableError (CoreDiagnostics.UnwrittenItem, item.Name, item.Span, item.Name);
+							AddMisspelledNameError (CoreDiagnostics.UnwrittenItem, item.Name, item.Span, item.Name);
 						}
 					}
 					if (resolvedItem is not null) {
@@ -601,13 +607,13 @@ namespace MonoDevelop.MSBuild.Language
 
 			// errors expected to be fixed by ChangeMisspelledNameFixProvider
 			// captures the information needed by the fixer
-			void AddFixableError (MSBuildDiagnosticDescriptor d, string symbolName, TextSpan symbolSpan, params object[] args)
+			void AddMisspelledNameError (MSBuildDiagnosticDescriptor d, string symbolName, TextSpan symbolSpan, params object[] args)
 			{
 				Document.Diagnostics.Add (
 					d,
 					symbolSpan,
 					ImmutableDictionary<string, object>.Empty
-						.Add ("Name", symbolName),
+						.Add (DiagnosticProperty.MisspelledNameOrValue, symbolName),
 					args
 				);
 			}
@@ -631,11 +637,11 @@ namespace MonoDevelop.MSBuild.Language
 			else if (!isCustomType || (customType is not null && !customType.AllowUnknownValues)) {
 				bool isKnownValue = Document.GetSchemas (true).TryGetKnownValue (valueSymbol, value, out ITypedSymbol? knownValue, out bool isError);
 				if (isError) {
-					AddFixableError (CoreDiagnostics.UnknownValue, DescriptionFormatter.GetTitleCaseKindNoun (valueSymbol), valueSymbol.Name, value);
+					AddMisspelledValueError (CoreDiagnostics.UnknownValue, DescriptionFormatter.GetTitleCaseKindNoun (valueSymbol), valueSymbol.Name, value);
 					return;
 				}
-				if (isKnownValue && knownValue is IDeprecatable deprecatable) {
-					CheckDeprecated (deprecatable, expressionText);
+				if (isKnownValue && knownValue is IVersionableSymbol versionableSymbol) {
+					CheckDeprecated (versionableSymbol, expressionText);
 				}
 			}
 
@@ -663,7 +669,7 @@ namespace MonoDevelop.MSBuild.Language
 				break;
 			case MSBuildValueKind.Bool:
 				if (!bool.TryParse (value, out _)) {
-					AddFixableError (CoreDiagnostics.InvalidBool, value);
+					AddMisspelledValueError (CoreDiagnostics.InvalidBool, value);
 				}
 				break;
 			case MSBuildValueKind.Url:
@@ -678,7 +684,7 @@ namespace MonoDevelop.MSBuild.Language
 				break;
 			case MSBuildValueKind.NuGetVersion:
 				if (!NuGet.Versioning.VersionRange.TryParse (value, out _)) {
-					AddErrorWithArgs (CoreDiagnostics.InvalidVersionSuffixed, value);
+					AddErrorWithArgs (CoreDiagnostics.InvalidNuGetVersionExpression, value);
 				}
 				break;
 			case MSBuildValueKind.VersionSuffixed:
@@ -729,7 +735,7 @@ namespace MonoDevelop.MSBuild.Language
 				}
 				break;
 			case MSBuildValueKind.TargetFramework:
-				switch (FrameworkInfoProvider.Instance.ValidateFrameworkShortName (value, out var frameworkComponent, out var versionComponent, out var platformComponent, out var platformVersionComponent)) {
+				switch (FrameworkInfoProvider.Instance.ValidateFrameworkShortName (value, out var frameworkComponent, out var versionComponent, out var platformComponent, out var profileComponent, out var platformVersionComponent)) {
 				case FrameworkNameValidationResult.OK:
 					break;
 				case FrameworkNameValidationResult.Malformed:
@@ -744,13 +750,16 @@ namespace MonoDevelop.MSBuild.Language
 				case FrameworkNameValidationResult.UnknownPlatform:
 					AddErrorWithArgs (CoreDiagnostics.TargetFrameworkHasUnknownTargetPlatform, value, platformComponent);
 					break;
+				case FrameworkNameValidationResult.UnknownProfile:
+					AddErrorWithArgs (CoreDiagnostics.TargetFrameworkHasUnknownProfile, value, profileComponent);
+					break;
 				case FrameworkNameValidationResult.UnknownPlatformVersion:
 					AddErrorWithArgs (CoreDiagnostics.TargetFrameworkHasUnknownTargetPlatformVersion, value, platformVersionComponent, platformComponent);
 					break;
 				}
 				break;
 			case MSBuildValueKind.TargetFrameworkIdentifier:
-				if (!FrameworkInfoProvider.Instance.IsFrameworkIdentifierValid (value)) {
+				if (!FrameworkInfoProvider.Instance.IsKnownFrameworkIdentifier (value)) {
 					AddErrorWithArgs (CoreDiagnostics.UnknownTargetFrameworkIdentifier, value);
 				}
 				break;
@@ -763,7 +772,7 @@ namespace MonoDevelop.MSBuild.Language
 					if (Document is MSBuildRootDocument d && d.Frameworks.Count > 0) {
 						bool foundMatch = false;
 						foreach (var fx in d.Frameworks) {
-							if (FrameworkInfoProvider.AreVersionsEquivalent (fx.Version, fxv) && FrameworkInfoProvider.Instance.IsFrameworkVersionValid (fx.Framework, fxv)) {
+							if (FrameworkInfoProvider.AreVersionsEquivalent (fx.Version, fxv) && FrameworkInfoProvider.Instance.IsKnownFrameworkVersion (fx.Framework, fxv)) {
 								foundMatch = true;
 							}
 						}
@@ -808,17 +817,15 @@ namespace MonoDevelop.MSBuild.Language
 
 			void AddErrorWithArgs (MSBuildDiagnosticDescriptor d, params object[] args) => Document.Diagnostics.Add (d, new TextSpan (trimmedOffset, escapedLength), args);
 
-			// errors expected to be fixed by ChangeMisspelledNameFixProvider
-			// captures the information needed by the fixer
-			void AddFixableError (MSBuildDiagnosticDescriptor d, params object[] args)
+			// misspelled value expected to be fixed by ChangeMisspelledNameFixProvider
+			void AddMisspelledValueError (MSBuildDiagnosticDescriptor d, params object[] args)
 			{
 				Document.Diagnostics.Add (
 					d,
 					new TextSpan (trimmedOffset, escapedLength),
 					ImmutableDictionary<string, object>.Empty
-						.Add ("Name", value)
-						.Add ("ValueKind", kind)
-						.AddIfNotNull ("CustomType", valueSymbol.CustomType),
+						.Add (DiagnosticProperty.MisspelledNameOrValue, value)
+						.Add (DiagnosticProperty.MisspelledValueExpectedType, valueSymbol),
 					args
 				);
 			}

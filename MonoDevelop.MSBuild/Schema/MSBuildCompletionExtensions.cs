@@ -37,11 +37,14 @@ namespace MonoDevelop.MSBuild.Schema
 				if (!spat.IsAbstract) {
 					if (rr.ElementSyntax.SyntaxKind == MSBuildSyntaxKind.Item) {
 						if (isInTarget) {
-							if (spat.Name == "Update") {
+							if (spat.SyntaxKind == MSBuildSyntaxKind.Item_Update) {
 								continue;
 							}
 						} else {
-							if (spat.Name == "KeepMetadata" || spat.Name == "RemoveMetadata" || spat.Name == "KeepDuplicates") {
+							switch (spat.SyntaxKind) {
+							case MSBuildSyntaxKind.Item_KeepMetadata:
+							case MSBuildSyntaxKind.Item_RemoveMetadata:
+							case MSBuildSyntaxKind.Item_KeepDuplicates:
 								continue;
 							}
 						}
@@ -80,7 +83,7 @@ namespace MonoDevelop.MSBuild.Schema
 				goto case MSBuildSyntaxKind.ItemGroup;
 			case MSBuildSyntaxKind.ItemGroup:
 			case MSBuildSyntaxKind.PropertyGroup:
-				if (element.ParentElement is XElement te && te.NameEquals (MSBuildElementSyntax.Target.Name, true)) {
+				if (element.ParentElement is XElement te && te.Name.Equals (MSBuildElementSyntax.Target.Name, true)) {
 					targetElement = te;
 					return true;
 				}
@@ -251,7 +254,7 @@ namespace MonoDevelop.MSBuild.Schema
 
 			if (rr.AttributeSyntax?.SyntaxKind == MSBuildSyntaxKind.Import_Project && rr.Element != null) {
 
-				var sdkAtt = rr.Element.Attributes.Get ("Sdk", true)?.Value;
+				var sdkAtt = rr.Element.Attributes.Get (MSBuildAttributeName.Sdk, true)?.Value;
 				if (string.IsNullOrEmpty (sdkAtt) || !Microsoft.Build.Framework.SdkReference.TryParse (sdkAtt, out var sdkRef)) {
 					// if there's an invalid SDK attribute, don't try to provide path completion, it'll be wrong
 					return null;
@@ -350,24 +353,51 @@ namespace MonoDevelop.MSBuild.Schema
 
 		public static ISymbol GetResolvedReference (this MSBuildResolveResult rr, MSBuildRootDocument doc, IFunctionTypeProvider functionTypeProvider)
 		{
+			static bool AreEqual (string? a, string? b) => string.Equals (a, b, StringComparison.OrdinalIgnoreCase);
+
 			switch (rr.ReferenceKind) {
 			case MSBuildReferenceKind.Item:
-				return doc.GetItem (rr.GetItemReference ());
+				// it's it's an item element, it's already captured on the resolver
+				string itemName = rr.GetItemReference ();
+				if (rr.ElementSymbol is ItemInfo item && AreEqual (item.Name, itemName)) {
+					return rr.ElementSymbol;
+				}
+				// if it's an item reference within an expression, we need to resolve it
+				return  doc.GetItem (rr.GetItemReference ());
 			case MSBuildReferenceKind.Metadata:
 				var m = rr.GetMetadataReference ();
+				bool IsMetadataMatch (MetadataInfo possibleMetadata) => AreEqual (possibleMetadata.Name, m.metaName) && AreEqual (possibleMetadata.Item?.Name, m.itemName);
+				if (rr.AttributeSymbol is MetadataInfo metadataAttribute && IsMetadataMatch (metadataAttribute)) {
+					return metadataAttribute;
+				}
+				if (rr.AttributeSymbol is MetadataInfo metadataElement && IsMetadataMatch (metadataElement)) {
+					return metadataElement;
+				}
 				return doc.GetMetadata (m.itemName, m.metaName, true);
 			case MSBuildReferenceKind.Property:
-				return doc.GetProperty (rr.GetPropertyReference (), true);
+				string propertyName = rr.GetPropertyReference ();
+				if (rr.ElementSymbol is PropertyInfo propertySymbol && AreEqual (propertySymbol.Name, propertyName)) {
+					return propertySymbol;
+				}
+				return doc.GetProperty (propertyName, true);
 			case MSBuildReferenceKind.Task:
-				return doc.GetTask (rr.GetTaskReference ());
+				string taskName = rr.GetTaskReference ();
+				if (rr.ElementSymbol is TaskInfo taskSymbol && AreEqual (taskSymbol.Name, taskName)) {
+					return taskSymbol;
+				}
+				return doc.GetTask (taskName);
 			case MSBuildReferenceKind.Target:
-				return doc.GetTarget (rr.GetTargetReference());
+				string targetName = rr.GetTargetReference ();
+				if (rr.ElementSymbol is TargetInfo targetSymbol && AreEqual (targetSymbol.Name, targetName)) {
+					return targetSymbol;
+				}
+				return doc.GetTarget (targetName);
 			case MSBuildReferenceKind.Keyword:
 				return rr.GetKeywordReference ();
 			case MSBuildReferenceKind.KnownValue:
 				return rr.GetKnownValueReference ();
 			case MSBuildReferenceKind.TargetFramework:
-				return ResolveFramework (rr.GetTargetFrameworkReference ());
+				return FrameworkInfoProvider.TryGetFrameworkInfo (rr.GetTargetFrameworkReference ());
 			case MSBuildReferenceKind.TargetFrameworkIdentifier:
 				return BestGuessResolveFrameworkIdentifier (rr.GetTargetFrameworkIdentifierReference (), doc.Frameworks);
 			case MSBuildReferenceKind.TargetFrameworkVersion:
@@ -376,6 +406,9 @@ namespace MonoDevelop.MSBuild.Schema
 				return BestGuessResolveFrameworkProfile (rr.GetTargetFrameworkProfileReference(), doc.Frameworks);
 			case MSBuildReferenceKind.TaskParameter:
 				var p = rr.GetTaskParameterReference ();
+				if (rr.AttributeSymbol is TaskParameterInfo parameterSymbol && AreEqual (parameterSymbol.Name, p.paramName)) {
+					return parameterSymbol;
+				}
 				return doc.GetTaskParameter (p.taskName, p.paramName);
 			case MSBuildReferenceKind.ItemFunction:
 				//FIXME: attempt overload resolution
@@ -397,15 +430,6 @@ namespace MonoDevelop.MSBuild.Schema
 					return conditionFunctionName;
 				}
 				return null;
-			}
-			return null;
-		}
-
-		static FrameworkInfo ResolveFramework (string shortname)
-		{
-			var fullref = NuGetFramework.ParseFolder (shortname);
-			if (fullref.IsSpecificFramework) {
-				return new FrameworkInfo (shortname, fullref);
 			}
 			return null;
 		}

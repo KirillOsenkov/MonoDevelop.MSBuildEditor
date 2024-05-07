@@ -1,6 +1,12 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+#if NETCOREAPP
+#nullable enable
+#else
+#nullable enable annotations
+#endif
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -49,7 +55,7 @@ namespace MonoDevelop.MSBuild.Language
 			return false;
 		}
 
-		public static MSBuildNavigationResult GetNavigation (
+		public static MSBuildNavigationResult? GetNavigation (
 			MSBuildRootDocument doc, int offset, MSBuildResolveResult rr)
 		{
 			if (rr == null) {
@@ -57,6 +63,10 @@ namespace MonoDevelop.MSBuild.Language
 			}
 
 			var annotations = GetAnnotationsAtOffset<NavigationAnnotation> (doc, offset);
+			if (annotations is null) {
+				return null;
+			}
+
 			var firstAnnotation = annotations.FirstOrDefault ();
 			if (firstAnnotation != null) {
 				var arr = GetAnnotatedPaths ().ToArray ();
@@ -78,6 +88,14 @@ namespace MonoDevelop.MSBuild.Language
 				}
 			}
 
+			if (rr.ReferenceKind == MSBuildReferenceKind.Item) {
+				return new MSBuildNavigationResult (MSBuildReferenceKind.Item, rr.GetItemReference (), rr.ReferenceOffset, rr.ReferenceLength);
+			}
+
+			if (rr.ReferenceKind == MSBuildReferenceKind.Property) {
+				return new MSBuildNavigationResult (MSBuildReferenceKind.Property, rr.GetPropertyReference (), rr.ReferenceOffset, rr.ReferenceLength);
+			}
+
 			if (rr.ReferenceKind == MSBuildReferenceKind.Target) {
 				return new MSBuildNavigationResult (MSBuildReferenceKind.Target, rr.GetTargetReference (), rr.ReferenceOffset, rr.ReferenceLength);
 			}
@@ -90,7 +108,7 @@ namespace MonoDevelop.MSBuild.Language
 
 			if (rr.ReferenceKind == MSBuildReferenceKind.Task) {
 				var task = doc.GetTask (rr.GetTaskReference ());
-				if (task.DeclaredInFile != null) {
+				if (task?.DeclaredInFile != null) {
 					return new MSBuildNavigationResult (
 						MSBuildReferenceKind.Task, task.Name, rr.ReferenceOffset, rr.ReferenceLength,
 						task.DeclaredInFile, task.DeclaredAtOffset
@@ -105,7 +123,7 @@ namespace MonoDevelop.MSBuild.Language
 			return null;
 		}
 
-		public static IEnumerable<T> GetAnnotationsAtOffset<T> (MSBuildRootDocument doc, int offset)
+		public static IEnumerable<T>? GetAnnotationsAtOffset<T> (MSBuildRootDocument doc, int offset)
 		{
 			var xobj = doc.XDocument.FindAtOffset (offset);
 			if (xobj == null) {
@@ -118,8 +136,11 @@ namespace MonoDevelop.MSBuild.Language
 
 		public static List<MSBuildNavigationResult> ResolveAll (MSBuildRootDocument doc, int offset, int length, ILogger logger)
 		{
+			if (doc.XDocument.RootElement is not XElement rootElement) {
+				return new ();
+			}
 			var visitor = new MSBuildNavigationVisitor (doc, doc.Text, logger);
-			visitor.Run (doc.XDocument.RootElement, offset, length);
+			visitor.Run (rootElement, offset, length);
 			return visitor.Navigations;
 		}
 
@@ -133,25 +154,12 @@ namespace MonoDevelop.MSBuild.Language
 
 			protected override void VisitResolvedAttribute (
 				XElement element, XAttribute attribute,
-				MSBuildElementSyntax resolvedElement, MSBuildAttributeSyntax resolvedAttribute, ITypedSymbol? symbol)
+				MSBuildElementSyntax elementSyntax, MSBuildAttributeSyntax attributeSyntax,
+				ITypedSymbol elementSymbol, ITypedSymbol attributeSymbol)
 			{
-				switch (resolvedElement.SyntaxKind) {
-				case MSBuildSyntaxKind.Import:
-					if (attribute.NameEquals ("Project", true)) {
-						CaptureAnnotations ();
-					}
-					break;
-				case MSBuildSyntaxKind.Project:
-					if (attribute.NameEquals ("Sdk", true)) {
-						CaptureAnnotations ();
-					}
-					break;
-				}
-
-				base.VisitResolvedAttribute (element, attribute, resolvedElement, resolvedAttribute, symbol);
-
-				void CaptureAnnotations ()
-				{
+				switch (attributeSyntax.SyntaxKind) {
+				case MSBuildSyntaxKind.Project_Sdk:
+				case MSBuildSyntaxKind.Import_Project:
 					var annotations = Document.Annotations.GetMany<NavigationAnnotation> (attribute);
 					if (annotations != null) {
 						foreach (var group in annotations.GroupBy (a => a.Span.Start)) {
@@ -161,13 +169,20 @@ namespace MonoDevelop.MSBuild.Language
 							));
 						}
 					}
+					break;
 				}
+
+				base.VisitResolvedAttribute (element, attribute, elementSyntax, attributeSyntax, elementSymbol, attributeSymbol);
 			}
 
 			protected override void VisitValue (
-				XElement element, XAttribute attribute, MSBuildElementSyntax elementSymbol, MSBuildAttributeSyntax attributeSymbol,
-				ITypedSymbol valueSymbol, string expressionText, ExpressionNode node)
+				XElement element, XAttribute? attribute,
+				MSBuildElementSyntax elementSyntax, MSBuildAttributeSyntax? attributeSyntax,
+				ITypedSymbol elementSymbol, ITypedSymbol? attributeSymbol,
+				string expressionText, ExpressionNode node)
 			{
+				var valueSymbol = attributeSymbol ?? elementSymbol;
+
 				switch (valueSymbol.ValueKindWithoutModifiers ()) {
 				case MSBuildValueKind.TargetName:
 					foreach (var n in node.WithAllDescendants ()) {
@@ -200,7 +215,7 @@ namespace MonoDevelop.MSBuild.Language
 			}
 		}
 
-		public static MSBuildNavigationResult GetPathFromNode (ExpressionNode node, MSBuildRootDocument document, ILogger logger)
+		public static MSBuildNavigationResult? GetPathFromNode (ExpressionNode node, MSBuildRootDocument document, ILogger logger)
 		{
 			try {
 				var path = MSBuildCompletionExtensions.EvaluateExpressionAsPaths (node, document).FirstOrDefault ();
@@ -223,7 +238,7 @@ namespace MonoDevelop.MSBuild.Language
 	{
 		public MSBuildNavigationResult (
 			MSBuildReferenceKind kind, string name, int offset, int length,
-			string destFile = null, int destOffset = default)
+			string? destFile = null, int destOffset = default)
 		{
 			Kind = kind;
 			Name = name;
@@ -242,11 +257,11 @@ namespace MonoDevelop.MSBuild.Language
 		}
 
 		public MSBuildReferenceKind Kind { get; }
-		public string Name { get; }
+		public string? Name { get; }
 		public int Offset { get; }
 		public int Length { get; }
-		public string[] Paths { get; }
-		public string DestFile { get; }
+		public string[]? Paths { get; }
+		public string? DestFile { get; }
 		public int DestOffset { get; }
 	}
 }
