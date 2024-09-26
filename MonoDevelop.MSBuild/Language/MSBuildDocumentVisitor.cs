@@ -2,7 +2,9 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+#if NETCOREAPP
 #nullable enable
+#endif
 
 using System;
 using System.Collections.Generic;
@@ -125,11 +127,6 @@ abstract class MSBuildDocumentVisitor
 			}
 
 			var attributeSymbol = GetSchemas ().GetAttributeInfo (attributeSyntax, elementName, attributeName);
-
-			// GetAttributeInfo may have returned a specialized variant of the MSBuildAttributeSyntax, so update it
-			if (attributeSymbol is MSBuildAttributeSyntax specializedAttributeSyntax) {
-				attributeSyntax = specializedAttributeSyntax;
-			}
 
 			VisitResolvedAttribute (element, att, elementSyntax, attributeSyntax, elementSymbol, attributeSymbol ?? attributeSyntax);
 		}

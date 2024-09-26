@@ -1,6 +1,8 @@
 // Copyright (c) Microsoft. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+#nullable enable
+
 using System;
 using System.Collections.Generic;
 
@@ -37,12 +39,12 @@ namespace MonoDevelop.MSBuild.SdkResolution
 			Paths = paths;
 		}
 
-		public SdkInfo (string name, string version, string path)
+		public SdkInfo (string name, string? version, string path)
 			: this (name, version, new[] { path })
 		{
 		}
 
-		public SdkInfo (string name, string version, IList<string> paths)
+		public SdkInfo (string name, string? version, IList<string> paths)
 		{
 			Name = name ?? throw new ArgumentNullException (nameof (name));
 			Version = version;
@@ -50,7 +52,7 @@ namespace MonoDevelop.MSBuild.SdkResolution
 		}
 
 		public string Name { get; }
-		public string Version { get; }
+		public string? Version { get; }
 
 		/// <summary>
 		/// The SDK path(s). May be empty e.g. for WorkloadAutoImportPropsLocator, but will not be null.
@@ -60,9 +62,9 @@ namespace MonoDevelop.MSBuild.SdkResolution
 		/// <summary>
 		/// Returns the first path, or null if none are defined.
 		/// </summary>
-		public string Path => Paths is not null && Paths.Count > 0 ? Paths[0] : null;
+		public string? Path => Paths is not null && Paths.Count > 0 ? Paths[0] : null;
 
-		public IDictionary<string, SdkResultItem> ItemsToAdd { get; }
-		public IDictionary<string, string> PropertiesToAdd { get; }
+		public IDictionary<string, SdkResultItem>? ItemsToAdd { get; }
+		public IDictionary<string, string>? PropertiesToAdd { get; }
 	}
 }

@@ -96,6 +96,11 @@
           "isList": true,
           "type": { "$ref": "#/types/nuGetWarningCode" },
           "helpUrl": "https://learn.microsoft.com/nuget/consume-packages/package-references-in-project-files#suppressing-nuget-warnings"
+        },
+        "GeneratePathProperty": {
+          "description": "If enabled, causes an MSBuild property with the path to the root of the `PackageReference` to be created",
+          "type": "bool",
+          "helpUrl": "https://learn.microsoft.com/nuget/consume-packages/package-references-in-project-files#generatepathproperty"
         }
       }
     },
@@ -1057,8 +1062,15 @@
     },
     {
       "$appliesTo": [ "UpToDateCheckInput", "UpToDateCheckOutput", "UpToDateCheckBuilt" ],
-        "Set": "Optional group(s) of inputs and outputs that should be considered in isolation during build. Useful when a build involves multiple discrete compilation/transpilation steps. Semicolon-delimited when multiple sets are required.",
-        "Kind": "Optional identifier for this item that allows it to be omitted from the fast up-to-date check via a global property."
+      "Set": "Optional group(s) of inputs and outputs that should be considered in isolation during build. Useful when a build involves multiple discrete compilation/transpilation steps. Semicolon-delimited when multiple sets are required.",
+      "Kind": "Optional identifier for this item that allows it to be omitted from the fast up-to-date check via a global property."
+    },
+    {
+      "$appliesTo": [ "PackageReference", "ProjectReference" ],
+      "TreatAsUsed": {
+        "description": "Whether the *Remove unused references* command in Visual Studio should retain this reference even if it appears to be unused",
+        "type": "bool"
+      }
     }
   ],
   "types": {

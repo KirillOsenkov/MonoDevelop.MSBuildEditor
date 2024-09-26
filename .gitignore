@@ -7,3 +7,11 @@ packages
 .vs
 *.user
 *.binlog
+out
+node_modules
+.vscode-test
+dist
+
+/msbuild-editor-vscode/LICENSE
+/msbuild-editor-vscode/server
+/msbuild-editor-vscode/*.vsix

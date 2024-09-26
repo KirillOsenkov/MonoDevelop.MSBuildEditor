@@ -19,7 +19,7 @@ namespace MonoDevelop.MSBuild
 	{
 		Version EngineVersion { get; }
 		string ToolsVersion { get; }
-		string ToolsPath { get; }
+		string? ToolsPath { get; }
 
 		/// <summary>
 		/// Properties defined by the MSBuild toolset, such as MSBuildExtensionsPaths
@@ -35,10 +35,8 @@ namespace MonoDevelop.MSBuild
 
 		IList<SdkInfo> GetRegisteredSdks ();
 
-		//NOTE: we don't use SdkReference so as not to expose Microsoft.Build API publicly
-		//as that causes issues in VSMac's unit test discovery
 		// TODO: should this support reporting warnings up to the caller as user-visible warnings rather than log messages?
-		SdkInfo ResolveSdk ((string name, string version, string minimumVersion) sdk, string projectFile, string solutionPath, ILogger? logger);
+		SdkInfo? ResolveSdk (MSBuildSdkReference sdkReference, string projectFile, string? solutionPath, ILogger logger);
 	}
 
 	public static class MSBuildEnvironmentExtensions

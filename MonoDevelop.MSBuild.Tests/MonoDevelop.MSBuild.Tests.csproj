@@ -1,23 +1,33 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net7.0</TargetFrameworks>
-    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('Windows'))">net48;net7.0</TargetFrameworks>
-    <NUnitDisableSupportAssemblies>true</NUnitDisableSupportAssemblies>
+    <TargetFrameworks>net48;net8.0</TargetFrameworks>
+  </PropertyGroup>
+
+  <!-- always build tests on net48, but only try to run tests on net48 when on windows -->
+  <PropertyGroup Condition="'$(TargetFramework)'=='net48' and !$([MSBuild]::IsOSPlatform('Windows'))">
+    <TestProject>False</TestProject>
+    <IsTestProject>False</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Collections.Immutable" Version="7.0.0" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-    <PackageReference Include="NUnit" Version="3.14.0" />
-    <PackageReference Include="NUnit.Analyzers" Version="3.10.0" />
-    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
-    <PackageReference Include="Microsoft.Build.Locator" Version="1.4.1" />
+    <PackageReference Include="System.Collections.Immutable" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit.Analyzers" />
+    <PackageReference Include="NUnit3TestAdapter" />
+    <PackageReference Include="Microsoft.Build.Locator" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Moq" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\MonoDevelop.MSBuild\MonoDevelop.MSBuild.csproj" />
     <ProjectReference Include="..\MonoDevelop.Xml\Core.Tests\MonoDevelop.Xml.Core.Tests.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="PackageSearch\TestFiles\*.xml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

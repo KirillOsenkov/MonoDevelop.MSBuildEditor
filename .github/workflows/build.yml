@@ -18,57 +18,59 @@ jobs:
       NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
         fetch-depth: 0 # GitVersioning needs deep clone
 
     - name: Set up dotnet
-      uses: actions/setup-dotnet@v2
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: |
-          6.0.x
-          7.0.x
+          8.0.x
 
-    - name: Find MSBuild
-      if: startsWith(matrix.os, 'windows')
-      uses: microsoft/setup-msbuild@v1.1.0
-
-    - uses: actions/cache@v3
+    - uses: actions/cache@v4
       with:
         path: ${{ env.NUGET_PACKAGES }}
         key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
 
-    - name: Restore (dotnet)
-      if: startsWith(matrix.os, 'macos')
+    - name: Restore
       run: dotnet restore -p:Configuration=${{ matrix.config }}
 
-    - name: Build (dotnet)
-      if: startsWith(matrix.os, 'macos')
+    - name: Build
       run: dotnet build --no-restore -c ${{ matrix.config }} -p:CreatePackage=true
-
-    - name: Restore (MSBuild)
-      if: startsWith(matrix.os, 'windows')
-      run: msbuild -t:Restore -p:Configuration=${{ matrix.config }}
-
-    - name: Build (MSBuild)
-      if: startsWith(matrix.os, 'windows')
-      run: msbuild MonoDevelop.MSBuildEditor.sln -p:Configuration=${{ matrix.config }}
 
     - name: Test
       run: dotnet test --no-build -c ${{ matrix.config }}
 
-    - uses: actions/upload-artifact@v3
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Install NBGV
+      uses: dotnet/nbgv@master
+      id: nbgv
+
+    - name: Install NPM dependencies
+      working-directory: msbuild-editor-vscode
+      run: npm install
+
+    - name: Pack VSCode Extension
+      working-directory: msbuild-editor-vscode
+      run: npx vsce package --no-git-tag-version --pre-release ${{ steps.nbgv.outputs.NpmPackageVersion }}
+
+    - uses: actions/upload-artifact@v4
       if: startsWith(matrix.os, 'windows')
       with:
-        name: MSBuild Editor Extension Package (VSWin)
-        path: MonoDevelop.MSBuild.Editor.VisualStudio/bin/**/*.vsix
+        name: MSBuild Editor VSIX (Visual Studio) ${{ steps.nbgv.outputs.NuGetPackageVersion }}
+        path: artifacts/bin/MonoDevelop.MSBuild.Editor.VisualStudio/${{ matrix.config }}/MonoDevelop.MSBuild.Editor.VisualStudio.${{ steps.nbgv.outputs.Version }}.vsix
+        if-no-files-found: error
 
-    - uses: actions/upload-artifact@v3
-      if: startsWith(matrix.os, 'macos')
+    - uses: actions/upload-artifact@v4
       with:
-        name: MSBuild Editor Extension Package (VSMac)
-        path: MonoDevelop.MSBuildEditor/bin/**/*.mpack
+        name: MSBuild Editor VSIX (VS Code) ${{ steps.nbgv.outputs.NpmPackageVersion }}
+        path: msbuild-editor-vscode/msbuild-editor-${{ steps.nbgv.outputs.NpmPackageVersion }}.vsix
         if-no-files-found: error

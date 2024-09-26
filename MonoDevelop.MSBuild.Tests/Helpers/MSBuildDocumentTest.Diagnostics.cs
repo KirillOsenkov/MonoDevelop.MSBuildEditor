@@ -22,25 +22,29 @@ namespace MonoDevelop.MSBuild.Tests;
 
 partial class MSBuildDocumentTest
 {
-	public static IList<MSBuildDiagnostic> GetDiagnostics (
+	public static MSBuildRootDocument ParseDocumentWithDiagnostics (
 		string source,
-		out MSBuildRootDocument parsedDocument,
-		ICollection<MSBuildAnalyzer>? analyzers = null,
+		IEnumerable<MSBuildAnalyzer>? analyzers = null,
 		bool includeCoreDiagnostics = false,
 		ILogger? logger = null,
 		MSBuildSchema? schema = null,
 		MSBuildRootDocument? previousDocument = null,
+		IEnumerable<MSBuildDiagnosticDescriptor>? ignoreDiagnostics = null,
 		CancellationToken cancellationToken = default
 		)
 	{
 		// internal errors should cause test failure
 		logger ??= TestLoggerFactory.CreateTestMethodLogger ().RethrowExceptions ();
 
-		parsedDocument = GetParsedDocument (source, logger, schema, previousDocument, cancellationToken);
+		// suppress LogDidNotFindSdk messages as they are super noisy
+		// and not relevant when testing diagnostics, as we will get diagnostics for them anyways
+		logger = logger.WithFilter (["LogDidNotFindSdk"]);
+
+		var parsedDocument = ParseDocument (source, logger, schema, previousDocument, cancellationToken);
 
 		var analyzerDriver = new MSBuildAnalyzerDriver (logger);
 
-		if (analyzers != null && analyzers.Count > 0) {
+		if (analyzers != null && analyzers.Any ()) {
 			analyzerDriver.AddAnalyzers (analyzers);
 		} else if (!includeCoreDiagnostics) {
 			throw new ArgumentException ("Analyzers can only be null or empty if core diagnostics are included", nameof (analyzers));
@@ -48,7 +52,15 @@ partial class MSBuildDocumentTest
 
 		var actualDiagnostics = analyzerDriver.Analyze (parsedDocument, includeCoreDiagnostics, cancellationToken);
 
-		return actualDiagnostics ?? [];
+		if (actualDiagnostics is not null && ignoreDiagnostics is not null) {
+			var ignoredDiagnosticIds = ignoreDiagnostics.Select (d => d.Id).ToHashSet ();
+			actualDiagnostics = actualDiagnostics.Where (a => !ignoredDiagnosticIds.Contains (a.Descriptor.Id)).ToList ();
+		}
+
+		parsedDocument.Diagnostics.Clear ();
+		parsedDocument.Diagnostics.AddRange (actualDiagnostics ?? []);
+
+		return parsedDocument;
 	}
 
 	public static void VerifyDiagnostics (string source, MSBuildAnalyzer analyzer, params MSBuildDiagnostic[] expectedDiagnostics)
@@ -66,9 +78,10 @@ partial class MSBuildDocumentTest
 		MSBuildDiagnostic[]? expectedDiagnostics = null,
 		ILogger? logger = null,
 		MSBuildRootDocument? previousDocument = null,
-		bool includeNoTargetsWarning = false
+		bool includeNoTargetsWarning = false,
+		IEnumerable<MSBuildDiagnosticDescriptor>? ignoreDiagnostics = null
 		)
-		=> VerifyDiagnostics (source, out _, analyzers, includeCoreDiagnostics, ignoreUnexpectedDiagnostics, schema, expectedDiagnostics, logger, previousDocument, includeNoTargetsWarning);
+		=> VerifyDiagnostics (source, out _, analyzers, includeCoreDiagnostics, ignoreUnexpectedDiagnostics, schema, expectedDiagnostics, logger, previousDocument, includeNoTargetsWarning, ignoreDiagnostics);
 
 	public static void VerifyDiagnostics (
 		string source,
@@ -80,10 +93,12 @@ partial class MSBuildDocumentTest
 		MSBuildDiagnostic[]? expectedDiagnostics = null,
 		ILogger? logger = null,
 		MSBuildRootDocument? previousDocument = null,
-		bool includeNoTargetsWarning = false
+		bool includeNoTargetsWarning = false,
+		IEnumerable<MSBuildDiagnosticDescriptor>? ignoreDiagnostics = null
 		)
 	{
-		var actualDiagnostics = GetDiagnostics (source, out parsedDocument, analyzers, includeCoreDiagnostics, logger, schema, previousDocument);
+		parsedDocument = ParseDocumentWithDiagnostics (source, analyzers, includeCoreDiagnostics, logger, schema, previousDocument, ignoreDiagnostics);
+		var actualDiagnostics = parsedDocument.Diagnostics;
 
 		var missingDiags = new List<MSBuildDiagnostic> ();
 
@@ -96,7 +111,7 @@ partial class MSBuildDocumentTest
 						Is.EquivalentTo (expectedDiag.Properties ?? Enumerable.Empty<KeyValuePair<string, object>> ())
 						.UsingDictionaryComparer<string, object> ());
 					// checks messageArgs
-					Assert.That (actualDiag.GetFormattedMessage (), Is.EquivalentTo (expectedDiag.GetFormattedMessage ()));
+					Assert.That (actualDiag.GetFormattedMessageWithTitle (), Is.EqualTo (expectedDiag.GetFormattedMessageWithTitle ()));
 					found = true;
 					actualDiagnostics.RemoveAt (i);
 					break;

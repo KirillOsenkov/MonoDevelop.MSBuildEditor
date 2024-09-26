@@ -1,9 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net7.0</TargetFrameworks>
-    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('Windows'))">net48;net7.0</TargetFrameworks>
+    <TargetFramework>net48</TargetFramework>
     <NUnitDisableSupportAssemblies>true</NUnitDisableSupportAssemblies>
+  </PropertyGroup>
+
+  <!-- always build tests on net48, but only try to run tests on net48 when on windows -->
+  <PropertyGroup Condition="'$(TargetFramework)'=='net48' and !$([MSBuild]::IsOSPlatform('Windows'))">
+    <TestProject>False</TestProject>
+    <IsTestProject>False</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>
@@ -11,24 +16,21 @@
     <ProjectReference Include="..\MonoDevelop.MSBuild.Editor\MonoDevelop.MSBuild.Editor.csproj" />
     <ProjectReference Include="..\MonoDevelop.Xml\Core.Tests\MonoDevelop.Xml.Core.Tests.csproj" />
     <ProjectReference Include="..\MonoDevelop.Xml\Editor.Tests\MonoDevelop.Xml.Editor.Tests.csproj" />
-    <ProjectReference Include="..\MonoDevelop.Xml\external\MiniEditor\Microsoft.VisualStudio.MiniEditor\Microsoft.VisualStudio.MiniEditor.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Collections.Immutable" Version="7.0.0" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-    <PackageReference Include="NUnit" Version="3.14.0" />
-    <PackageReference Include="NUnit.Analyzers" Version="3.10.0" />
-    <PackageReference Include="NUnit3TestAdapter" Version="4.5.0" />
+    <PackageReference Include="System.Collections.Immutable" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit.Analyzers" />
+    <PackageReference Include="NUnit3TestAdapter" />
+    <PackageReference Include="Microsoft.Build" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="runtime" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.1.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.1.0" />
-    <PackageReference Include="Microsoft.VisualStudio.ImageCatalog" Version="17.2.32505.113" NoWarn="NU1701" />
-    <PackageReference Include="Microsoft.VisualStudio.Language.Intellisense" Version="17.2.3194" NoWarn="NU1701" />
-    <PackageReference Include="Microsoft.VisualStudio.Language.StandardClassification" Version="17.2.3194" NoWarn="NU1701" />
-    <PackageReference Include="Microsoft.VisualStudio.Threading" Version="17.2.32" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Common" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
 
 </Project>

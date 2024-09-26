@@ -426,7 +426,7 @@ namespace MonoDevelop.MSBuild.Tests.Editor.Completion
 				CompletionTriggerReason.Backspace,
 				filename: "EagerElementTrigger.csproj");
 
-			Assert.Zero (result.Items.Length);
+			Assert.Zero (result.ItemList.Count);
 		}
 
 		[Test]
@@ -455,8 +455,16 @@ namespace MonoDevelop.MSBuild.Tests.Editor.Completion
 
 			result.AssertNonEmpty ();
 			result.AssertContains ("foo.txt");
+		}
 
-			result = await this.GetCompletionContext (
+		[Test]
+		public async Task PathCompletionDirectory ()
+		{
+			var testDirectory = TestMSBuildFileSystem.Instance.AddTestDirectory ();
+			testDirectory.AddFiles ("foo.txt", "bar.cs", "baz.cs");
+			testDirectory.AddDirectory ("foo").AddFiles ("hello.cs", "bye.cs");
+
+			var result = await this.GetCompletionContext (
 				@"<Project><PropertyGroup><FooPath>foo$</FooPath>",
 				CompletionTriggerReason.Insertion, '\\',
 				filename: testDirectory.Combine ("PathCompletion.csproj"));
