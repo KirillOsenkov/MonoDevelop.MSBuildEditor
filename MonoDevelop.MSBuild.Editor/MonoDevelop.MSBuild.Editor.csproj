@@ -5,6 +5,10 @@
     <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
     <GenerateDocumentationFile>True</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591;1573;CS8632</NoWarn>
+    <!--<OutDir>C:\Users\kirillo\.nuget\packages\microsoft.ide.internal.msbuildeditor\1.0.27\lib\net472\</OutDir>
+    <CopyLocalLockFileAssemblies>False</CopyLocalLockFileAssemblies>
+    <ResolveAssemblyReferencesFindRelatedFiles>false</ResolveAssemblyReferencesFindRelatedFiles>
+    <CopyDocumentationFileToOutputDirectory>false</CopyDocumentationFileToOutputDirectory>-->
   </PropertyGroup>
 
   <ItemGroup>
