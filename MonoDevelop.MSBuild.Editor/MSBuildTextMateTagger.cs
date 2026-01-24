@@ -10,10 +10,10 @@ using Microsoft.VisualStudio.Utilities;
 
 namespace MonoDevelop.MSBuild.Editor
 {
-	[Export (typeof (ITaggerProvider))]
-	[TagType (typeof (IClassificationTag))]
-	[TagType (typeof (IStructureTag))]
-	[ContentType (MSBuildContentType.Name)]
+	//[Export (typeof (ITaggerProvider))]
+	//[TagType (typeof (IClassificationTag))]
+	//[TagType (typeof (IStructureTag))]
+	//[ContentType (MSBuildContentType.Name)]
 	sealed class MSBuildTextMateTagger : ITaggerProvider
 	{
 		[ImportingConstructor]
