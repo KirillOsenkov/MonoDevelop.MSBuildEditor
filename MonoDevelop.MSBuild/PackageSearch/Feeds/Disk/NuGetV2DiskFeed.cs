@@ -58,7 +58,16 @@ internal class NuGetV2DiskFeed : IPackageFeed
             }
             else
             {
-                string dir = _fileSystem.EnumerateDirectories(_feed).OrderByDescending(x => SemanticVersion.Parse(_fileSystem.GetDirectoryNameOnly(x).Substring(id.Length + 1))).FirstOrDefault();
+                // v2 layout: {feed}/{id}.{version}/{id}.nuspec
+                // Only consider directories that actually belong to this package id;
+                // other directories in the feed may be shorter than the id
+                string dirPrefix = id + ".";
+                string dir = _fileSystem.EnumerateDirectories(_feed)
+                    .Select(x => (path: x, name: _fileSystem.GetDirectoryNameOnly(x)))
+                    .Where(x => x.name.Length > dirPrefix.Length && x.name.StartsWith(dirPrefix, StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(x => SemanticVersion.Parse(x.name.Substring(dirPrefix.Length)))
+                    .Select(x => x.path)
+                    .FirstOrDefault();
 
                 if (dir == null)
                 {
