@@ -3,7 +3,9 @@
   <PropertyGroup>
     <SignAssembly>true</SignAssembly>
     <AssemblyOriginatorKeyFile>$(MSBuildThisFileDirectory)private.snk</AssemblyOriginatorKeyFile>
-    <LangVersion>latest</LangVersion>
+    <!-- pinned: with "latest" a newer SDK (C# 14 first-class spans) rebinds array.Reverse() in external/roslyn
+         (DidChangeHandler.cs) to MemoryExtensions.Reverse and the roslyn sources no longer compile -->
+    <LangVersion>13</LangVersion>
     <DebugType>embedded</DebugType>
     <NBGV_ThisAssemblyNamespace>$(MSBuildProjectName)</NBGV_ThisAssemblyNamespace>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
